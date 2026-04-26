@@ -167,8 +167,9 @@ const Dashboard = () => {
           </div>
           <div className="flex-1 w-full h-full min-h-[300px] relative z-10">
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4}/>
@@ -191,7 +192,8 @@ const Dashboard = () => {
                   <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#888888', strokeWidth: 1, strokeDasharray: '4 4' }} />
                   <Area type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" filter="url(#shadow)" activeDot={{ r: 6, strokeWidth: 0, fill: '#4f46e5' }} />
                 </AreaChart>
-              </ResponsiveContainer>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground border-2 border-dashed border-border rounded-lg bg-secondary/20">
                 <p>Aucune donnée de contribution disponible pour le graphique</p>

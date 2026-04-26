@@ -89,11 +89,11 @@ const Communication = () => {
               data: { withSome: 'data' },
             }));
 
-            await fetch('https://exp.host/--/api/v2/push/send', {
+            // Routage de la requête via notre backend Render pour éviter le CORS
+            const API_URL = import.meta.env.VITE_API_URL || 'https://dmksytemebackend.onrender.com';
+            await fetch(`${API_URL}/api/notifications/send`, {
               method: 'POST',
               headers: {
-                Accept: 'application/json',
-                'Accept-encoding': 'gzip, deflate',
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify(messages),
