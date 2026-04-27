@@ -283,26 +283,12 @@ const Settings = () => {
         throw new Error("Identifiants incorrects ou autorisation refusée.");
       }
 
-      const { error: deleteSassError } = await supabase
-        .from('sass_contributions')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+      const { error: resetError } = await supabase.rpc('reset_annual_transactions');
 
-      if (deleteSassError) throw deleteSassError;
-
-      const { error: deleteExpensesError } = await supabase
-        .from('treasury_expenses')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (deleteExpensesError) throw deleteExpensesError;
-
-      const { error: deleteIncomesError } = await supabase
-        .from('treasury_incomes')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
-      if (deleteIncomesError) throw deleteIncomesError;
+      if (resetError) {
+        console.error("Erreur RPC reset:", resetError);
+        throw new Error("Impossible de réinitialiser. Avez-vous exécuté le script SQL dans Supabase ?");
+      }
       
       await supabase.from('activity_logs').insert([{
         user_email: user?.email || 'Admin',

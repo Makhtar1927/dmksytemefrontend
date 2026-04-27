@@ -10,12 +10,23 @@ const Communication = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
+  const [membersList, setMembersList] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
     type: 'Push Application',
     target_audience: 'Tous les membres',
     content: ''
   });
+
+  const [selectedSector, setSelectedSector] = useState('');
+  const [selectedMember, setSelectedMember] = useState('');
+
+  const SECTORS = [
+    "Vaisselle", "Café", "Restauration", "Organisation", "Sonorisation",
+    "Visuelle", "Bétail", "Cuisine", "Eau & Hygiène", "Protocole",
+    "Decoration", "Culturelle", "Conservatoire", "Campagne", "Jayanté Kat yi",
+    "Nouveau"
+  ];
 
   const fetchHistory = async () => {
     try {
@@ -36,8 +47,18 @@ const Communication = () => {
     }
   };
 
+  const fetchMembers = async () => {
+    try {
+      const { data } = await supabase.from('members').select('id, first_name, last_name, sector, expo_push_token').order('first_name');
+      if (data) setMembersList(data);
+    } catch (err) {
+      console.error("Erreur chargement membres:", err);
+    }
+  };
+
   useEffect(() => {
     fetchHistory();
+    fetchMembers();
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -48,13 +69,27 @@ const Communication = () => {
     e.preventDefault();
     if (!formData.content.trim()) return;
     
+    if (formData.target_audience === 'Secteur Spécifique' && !selectedSector) {
+      return alert("Veuillez choisir un secteur.");
+    }
+    if (formData.target_audience === 'Membre Spécifique' && !selectedMember) {
+      return alert("Veuillez choisir un membre.");
+    }
+    
     setLoading(true);
     
     try {
+      let audienceLog = formData.target_audience;
+      if (formData.target_audience === 'Secteur Spécifique') audienceLog = `Secteur: ${selectedSector}`;
+      if (formData.target_audience === 'Membre Spécifique') {
+        const m = membersList.find(m => m.id === selectedMember);
+        audienceLog = `Membre: ${m ? m.first_name + ' ' + m.last_name : selectedMember}`;
+      }
+
       const { error } = await supabase.from('communications').insert([
         {
           type: formData.type,
-          target_audience: formData.target_audience,
+          target_audience: audienceLog,
           content: formData.content,
           status: 'Envoyé',
           created_by: user?.email || 'Admin'
@@ -72,6 +107,10 @@ const Communication = () => {
         if (formData.target_audience === 'Bureau Uniquement') {
           const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière'];
           query = query.in('role', bureauRoles);
+        } else if (formData.target_audience === 'Secteur Spécifique') {
+          query = query.eq('sector', selectedSector);
+        } else if (formData.target_audience === 'Membre Spécifique') {
+          query = query.eq('id', selectedMember);
         }
         
         const { data: membersWithTokens } = await query;
@@ -86,6 +125,9 @@ const Communication = () => {
               sound: 'default',
               title: "Nouvelle Alerte DMK",
               body: formData.content,
+              priority: 'high',
+              categoryId: 'message',
+              channelId: 'default',
               data: { withSome: 'data' },
             }));
 
@@ -158,9 +200,39 @@ const Communication = () => {
               >
                 <option value="Tous les membres">Tous les membres (AG, Dahira)</option>
                 <option value="Bureau Uniquement">Membres du Bureau uniquement</option>
+                <option value="Secteur Spécifique">Secteur spécifique</option>
+                <option value="Membre Spécifique">Membre spécifique</option>
                 <option value="Retardataires Sass">Retardataires (Sass)</option>
               </select>
             </div>
+
+            {formData.target_audience === 'Secteur Spécifique' && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-semibold text-foreground mb-1.5">Sélectionnez le Secteur</label>
+                <select 
+                  value={selectedSector} 
+                  onChange={(e) => setSelectedSector(e.target.value)} 
+                  className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all shadow-sm cursor-pointer"
+                >
+                  <option value="">-- Choisir un secteur --</option>
+                  {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+
+            {formData.target_audience === 'Membre Spécifique' && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="block text-sm font-semibold text-foreground mb-1.5">Sélectionnez le Membre</label>
+                <select 
+                  value={selectedMember} 
+                  onChange={(e) => setSelectedMember(e.target.value)} 
+                  className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all shadow-sm cursor-pointer"
+                >
+                  <option value="">-- Choisir un membre --</option>
+                  {membersList.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name} ({m.sector})</option>)}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold text-foreground mb-1.5">Contenu du Message</label>

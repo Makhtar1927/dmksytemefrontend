@@ -140,8 +140,8 @@ const AdminLayout = () => {
           </div>
 
         {/* User & Logout Section (Fixed at bottom) */}
-        <div className="p-4 mb-2 flex-shrink-0">
-          <div className={`p-4 rounded-2xl transition-all duration-300 ${sidebarOpen ? 'bg-background/50 border border-black/5 dark:border-white/5' : ''}`}>
+        <div className="px-4 py-4 flex-shrink-0">
+          <div className={`rounded-2xl transition-all duration-300 ${sidebarOpen ? 'p-4 bg-background/50 border border-black/5 dark:border-white/5 mb-2' : ''}`}>
             {sidebarOpen && (
               <div className="flex items-center mb-4">
                 <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm uppercase relative">
@@ -157,11 +157,11 @@ const AdminLayout = () => {
             
             <button 
               onClick={handleSignOut}
-              className={`flex items-center w-full p-3 rounded-xl text-red-500/80 font-bold hover:bg-red-500 hover:text-white dark:hover:bg-red-500/20 dark:hover:text-red-400 transition-all duration-300 group ${!sidebarOpen && 'justify-center bg-red-500/10'}`}
-              title="Déconnexion"
+              className={`flex items-center w-full rounded-2xl text-red-500/80 font-bold hover:bg-red-500 hover:text-white dark:hover:bg-red-500/20 dark:hover:text-red-400 transition-all duration-300 group ${sidebarOpen ? 'p-3' : 'p-3.5 justify-center'}`}
+              title={!sidebarOpen ? "Déconnexion" : ""}
             >
-              <LogOut size={20} className={`${sidebarOpen ? 'mr-3' : ''} group-hover:-translate-x-1 transition-transform`} strokeWidth={2.5} />
-              {sidebarOpen && <span>Déconnexion</span>}
+              <LogOut size={22} className={`${sidebarOpen ? 'mr-4 ml-1' : ''} group-hover:scale-110 transition-transform`} strokeWidth={2} />
+              {sidebarOpen && <span className="tracking-wide">Déconnexion</span>}
             </button>
           </div>
         </div>
@@ -190,12 +190,6 @@ const AdminLayout = () => {
           </div>
           
           <div className="flex items-center space-x-5">
-            {/* Notifications Bell */}
-            <button className="relative p-3 rounded-full bg-card border border-white/20 dark:border-white/10 shadow-sm hover:shadow-md transition-all text-muted-foreground hover:text-foreground group">
-              <Bell size={20} className="group-hover:animate-swing" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
-
             {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
