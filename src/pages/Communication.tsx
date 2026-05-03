@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Send, MessageSquare, AlertTriangle, Loader2, Bell } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { logActivity } from '../utils/logger';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -11,6 +12,9 @@ const Communication = () => {
   const [fetching, setFetching] = useState(true);
   const [history, setHistory] = useState<any[]>([]);
   const [membersList, setMembersList] = useState<any[]>([]);
+  
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
   
   const [formData, setFormData] = useState({
     type: 'Push Application',
@@ -61,6 +65,70 @@ const Communication = () => {
     fetchMembers();
   }, []);
 
+  const handleDeleteCommunication = async (id: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette notification de l'historique ?")) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const productionUrl = 'https://dmksytemebackend.onrender.com';
+      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+
+      const response = await fetch(`${baseUrl}/api/communications/delete`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ communicationId: id })
+      });
+
+      const result = await response.json();
+      if (!response.ok || result.status === 'error') throw new Error(result.message);
+
+      const commToDelete = history.find(h => h.id === id);
+      await logActivity('SUPPRESSION', 'SYSTÈME', `Suppression d'une communication envoyée à: ${commToDelete?.target_audience || 'inconnu'}`);
+
+      setHistory(history.filter(h => h.id !== id));
+    } catch (err: any) {
+      console.error("Erreur suppression:", err);
+      alert("Erreur lors de la suppression: " + err.message);
+    }
+  };
+
+  const handleUpdateCommunication = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Non connecté");
+
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const productionUrl = 'https://dmksytemebackend.onrender.com';
+      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+
+      const response = await fetch(`${baseUrl}/api/communications/update`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ communicationId: id, content: editContent })
+      });
+
+      const result = await response.json();
+      if (!response.ok || result.status === 'error') throw new Error(result.message);
+
+      const commToUpdate = history.find(h => h.id === id);
+      await logActivity('MODIFICATION', 'SYSTÈME', `Modification du message envoyé à: ${commToUpdate?.target_audience || 'inconnu'}`);
+
+      setHistory(history.map(h => h.id === id ? { ...h, content: editContent } : h));
+      setEditingId(null);
+    } catch (err: any) {
+      console.error("Erreur modification:", err);
+      alert("Erreur lors de la modification: " + err.message);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -98,6 +166,8 @@ const Communication = () => {
 
       if (error) throw error;
 
+      await logActivity('CRÉATION', 'SYSTÈME', `Envoi d'une communication (${formData.type}) à: ${audienceLog}`);
+
       // ---------------------------------------------------------
       // ENVOI DES NOTIFICATIONS PUSH NATIVES (SONNERIE + BANNIÈRE)
       // ---------------------------------------------------------
@@ -132,20 +202,26 @@ const Communication = () => {
             }));
 
             // Routage de la requête via notre backend Render pour éviter le CORS
-            const API_URL = import.meta.env.VITE_API_URL || 'https://dmksytemebackend.onrender.com';
-            await fetch(`${API_URL}/api/notifications/send`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(messages),
-            });
+            try {
+              const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+              const productionUrl = 'https://dmksytemebackend.onrender.com';
+              const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+              
+              await fetch(`${baseUrl}/api/notifications/send`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(messages),
+              });
+            } catch (pushErr) {
+              console.warn("Push notification non envoyée, mais le message est enregistré.", pushErr);
+            }
           }
         }
       }
       // ---------------------------------------------------------
 
-      alert("Notification système envoyée avec succès ! L'application mobile la recevra.");
       setFormData({ ...formData, content: '' }); // Reset text
       fetchHistory(); // Refresh history
       
@@ -296,12 +372,33 @@ const Communication = () => {
                         {format(new Date(item.created_at), "dd MMM HH:mm", { locale: fr })}
                       </span>
                     </div>
-                    <p className="text-sm text-foreground font-medium line-clamp-2 mt-2 leading-relaxed">{item.content}</p>
-                    <div className="flex justify-between items-center mt-3 pt-3 border-t border-border/50">
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">{item.target_audience}</span>
-                      <span className="text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></div> Distribué
-                      </span>
+                    
+                    {editingId === item.id ? (
+                      <div className="mt-2 animate-in fade-in duration-200">
+                        <textarea 
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="w-full bg-background border border-primary/50 rounded-lg p-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          rows={3}
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button onClick={() => setEditingId(null)} className="text-xs px-3 py-1.5 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 font-medium transition-colors">Annuler</button>
+                          <button onClick={() => handleUpdateCommunication(item.id)} className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 font-medium transition-colors">Enregistrer</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground font-medium line-clamp-2 mt-2 leading-relaxed">{item.content}</p>
+                    )}
+                    
+                    <div className="flex flex-wrap justify-between items-center mt-3 pt-3 border-t border-border/50 gap-y-3 gap-x-2">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold truncate max-w-[200px]" title={item.target_audience}>{item.target_audience}</span>
+                      <div className="flex flex-wrap items-center gap-2 ml-auto">
+                        <button onClick={() => { setEditingId(item.id); setEditContent(item.content); }} className="text-[10px] text-blue-500 hover:text-blue-700 font-bold px-2 py-1 bg-blue-500/5 hover:bg-blue-500/10 rounded opacity-0 group-hover:opacity-100 transition-all">Modifier</button>
+                        <button onClick={() => handleDeleteCommunication(item.id)} className="text-[10px] text-red-500 hover:text-red-700 font-bold px-2 py-1 bg-red-500/5 hover:bg-red-500/10 rounded opacity-0 group-hover:opacity-100 transition-all">Supprimer</button>
+                        <span className="text-[10px] text-emerald-500 font-bold bg-emerald-500/10 px-2 py-1 rounded-full flex items-center whitespace-nowrap">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></div> Distribué
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}

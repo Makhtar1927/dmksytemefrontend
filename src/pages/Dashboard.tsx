@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Wallet, TrendingUp, CalendarCheck, Loader2, Calendar, ExternalLink, MapPin, Clock } from 'lucide-react';
+import { Users, Wallet, TrendingUp, Loader2, Calendar, ExternalLink, MapPin, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, parseISO, isValid } from 'date-fns';
@@ -64,13 +64,29 @@ const Dashboard = () => {
         const formattedChartData: any[] = [];
 
         if (summaryData) {
-          summaryData.forEach(item => {
-            totalFunds += Number(item.total_amount);
+          let previousTotal = 0;
+          summaryData.forEach((item, index) => {
+            const currentTotal = Number(item.total_amount);
+            totalFunds += currentTotal;
             const monthYear = format(parseISO(item.month_start), 'MMM yyyy', { locale: fr });
+            const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+            
+            let growth = 0;
+            if (index > 0) {
+              if (previousTotal > 0) {
+                growth = ((currentTotal - previousTotal) / previousTotal) * 100;
+              } else if (currentTotal > 0) {
+                growth = 100;
+              }
+            }
+
             formattedChartData.push({
-              name: monthYear,
-              total: Number(item.total_amount)
+              name: capitalizedMonth,
+              total: currentTotal,
+              growth: Math.round(growth)
             });
+            
+            previousTotal = currentTotal;
           });
         }
 
@@ -104,14 +120,23 @@ const Dashboard = () => {
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      const isPositive = data.growth >= 0;
       return (
-        <div className="bg-background/80 backdrop-blur-md border border-border/50 p-4 rounded-xl shadow-xl">
-          <p className="text-sm font-semibold text-muted-foreground mb-2">{label}</p>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-primary animate-pulse"></div>
-            <p className="text-lg font-extrabold text-foreground">
-              {payload[0].value.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">FCFA</span>
-            </p>
+        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-100 dark:border-gray-800 p-5 rounded-2xl shadow-2xl">
+          <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 tracking-widest uppercase">{label}</p>
+          <div className="flex items-end gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-[#1DC4E9] shadow-[0_0_12px_rgba(29,196,233,0.8)] animate-pulse"></div>
+              <p className="text-3xl font-black text-gray-900 dark:text-white tracking-tight leading-none">
+                {payload[0].value.toLocaleString()} <span className="text-sm font-semibold text-gray-400 ml-1">FCFA</span>
+              </p>
+            </div>
+            {data.growth !== undefined && data.growth !== 0 && (
+              <div className={`flex items-center text-xs font-extrabold px-2.5 py-1 rounded-lg mb-0.5 ${isPositive ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'}`}>
+                {isPositive ? '↑' : '↓'} {Math.abs(data.growth)}%
+              </div>
+            )}
           </div>
         </div>
       );
@@ -126,7 +151,7 @@ const Dashboard = () => {
         {loading && <Loader2 className="animate-spin text-primary" size={20} />}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard 
           title="Total Membres" 
           value={stats.totalMembers.toString()} 
@@ -147,12 +172,6 @@ const Dashboard = () => {
           icon={Wallet} 
           gradientClass="bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-900/20 dark:to-orange-900/20"
         />
-        <StatCard 
-          title="Taux de Présence" 
-          value="-- %" 
-          icon={CalendarCheck} 
-          gradientClass="bg-gradient-to-br from-purple-500/5 to-pink-500/5 dark:from-purple-900/20 dark:to-pink-900/20"
-        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
@@ -172,25 +191,26 @@ const Dashboard = () => {
                   <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#1DC4E9" stopOpacity={0.6}/>
+                      <stop offset="95%" stopColor="#1DC4E9" stopOpacity={0}/>
                     </linearGradient>
                     <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor="#4f46e5" floodOpacity="0.2"/>
+                      <feDropShadow dx="0" dy="8" stdDeviation="10" floodColor="#1DC4E9" floodOpacity="0.3"/>
                     </filter>
                   </defs>
-                  <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                  <XAxis dataKey="name" stroke="#a1a1aa" fontSize={11} fontWeight={600} tickLine={false} axisLine={false} dy={15} />
                   <YAxis 
-                    stroke="#888888" 
-                    fontSize={12} 
+                    stroke="#a1a1aa" 
+                    fontSize={11} 
+                    fontWeight={600}
                     tickLine={false} 
                     axisLine={false} 
-                    tickFormatter={(value) => `${value.toLocaleString()}`}
-                    dx={-10}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    dx={-15}
                   />
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-800/60" />
-                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#888888', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                  <Area type="monotone" dataKey="total" stroke="#4f46e5" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" filter="url(#shadow)" activeDot={{ r: 6, strokeWidth: 0, fill: '#4f46e5' }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f4f4f5" className="dark:stroke-gray-800/40" />
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#e4e4e7', strokeWidth: 2, strokeDasharray: '4 4' }} />
+                  <Area type="natural" dataKey="total" stroke="#1DC4E9" strokeWidth={5} fillOpacity={1} fill="url(#colorTotal)" filter="url(#shadow)" activeDot={{ r: 8, strokeWidth: 4, stroke: '#fff', fill: '#1DC4E9' }} />
                 </AreaChart>
                 </ResponsiveContainer>
               </div>

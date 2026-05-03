@@ -11,7 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['favicon.svg', 'icon.png'],
+      includeAssets: ['icon.png'],
       manifest: {
         name: 'DMK Platform Admin',
         short_name: 'DMK Admin',

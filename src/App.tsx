@@ -9,6 +9,7 @@ import Scheduler from './pages/Scheduler';
 import Communication from './pages/Communication';
 import Settings from './pages/Settings';
 import Journal from './pages/Journal';
+import Transactions from './pages/Transactions';
 import Login from './pages/Login';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
             }>
               <Route index element={<Dashboard />} />
               <Route path="membres" element={<Members />} />
+              <Route path="transactions" element={<Transactions />} />
               <Route path="planificateur" element={<Scheduler />} />
               <Route path="communication" element={<Communication />} />
               <Route path="journal" element={<Journal />} />
