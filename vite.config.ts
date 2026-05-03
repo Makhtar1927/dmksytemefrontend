@@ -33,11 +33,13 @@ export default defineConfig({
           }
         ]
       },
+      disable: process.cwd().includes("'"),
       workbox: {
         // Sécurité: Ne pas mettre en cache les requêtes API
         navigateFallbackDenylist: [/^\/api/],
         // Nettoyer les anciens caches pour éviter les fuites de données
         cleanupOutdatedCaches: true,
+        inlineWorkboxRuntime: true,
       }
     })
   ],

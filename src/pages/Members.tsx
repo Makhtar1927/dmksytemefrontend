@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Plus, MoreVertical, Shield, Loader2, X, Edit, Trash2, Power, CheckCircle, Copy } from 'lucide-react';
+import { Search, Plus, MoreVertical, Shield, Loader2, X, Edit, Trash2, Power, CheckCircle, Copy, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { createClient } from '@supabase/supabase-js';
 import { logActivity } from '../utils/logger';
 
 type Member = {
@@ -20,6 +19,7 @@ type Member = {
   sass_cahier?: number;
   sass_projets?: number;
   sass_autres?: number;
+  password?: string;
 };
 
 const SECTORS = [
@@ -69,6 +69,22 @@ const Members = () => {
     sass_projets: 0,
     sass_autres: 0,
   });
+
+  // Password Reveal Modal state
+  const [revealModalOpen, setRevealModalOpen] = useState(false);
+  const [revealMemberId, setRevealMemberId] = useState<string | null>(null);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [revealError, setRevealError] = useState('');
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [revealedPasswords, setRevealedPasswords] = useState<Record<string, string>>({});
+
+  // Reset Password Modal state
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetMemberId, setResetMemberId] = useState<string | null>(null);
+  const [resetNewPassword, setResetNewPassword] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [isResetting, setIsResetting] = useState(false);
 
   // Action Menu State
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -229,12 +245,35 @@ const Members = () => {
     try {
       if (editingMember) {
         // Update existing member
+        // Si l'email a été modifié, on doit le mettre à jour dans Supabase Auth
+        const oldEmail = editingMember.email;
+        const newEmail = formData.email ? formData.email.trim().toLowerCase() : null;
+        
+        if (oldEmail && newEmail && oldEmail !== newEmail) {
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const updateEmailResponse = await fetch(`${API_URL}/api/users/update-email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldEmail, newEmail })
+          });
+          
+          if (!updateEmailResponse.ok) {
+            const errorData = await updateEmailResponse.json();
+            if (updateEmailResponse.status === 409) {
+              alert(errorData.message);
+              setIsSubmitting(false);
+              return;
+            }
+            throw new Error(errorData.message || 'Erreur lors de la mise à jour de l\'email dans Auth');
+          }
+        }
+
         const { error } = await supabase
           .from('members')
           .update({
             first_name: formData.first_name,
             last_name: formData.last_name,
-            email: formData.email || null,
+            email: newEmail,
             phone: formData.phone || null,
             role: formData.role,
             sector: formData.sector || null,
@@ -256,60 +295,49 @@ const Members = () => {
         
         // 1. Generate auth credentials
         const generatedPassword = generatePassword();
-        const loginEmail = formData.email || `${dmk_id.toLowerCase()}@dmk.sn`;
+        let loginEmail = formData.email ? formData.email.trim().toLowerCase() : `${dmk_id.toLowerCase()}@dmk.sn`;
 
-        // 2. Create an isolated Supabase client to not override admin session
-        const adminAuthClient = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY,
-          { auth: { persistSession: false, autoRefreshToken: false } }
-        );
+        // 2. Préparation des données du membre
+        const newMemberData = {
+          dmk_id,
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          phone: formData.phone || null,
+          role: formData.role,
+          sector: formData.sector || null,
+          sass_magal: formData.sass_magal,
+          sass_ziaar: formData.sass_ziaar,
+          sass_kst: formData.sass_kst,
+          sass_cahier: formData.sass_cahier,
+          sass_projets: formData.sass_projets,
+          sass_autres: formData.sass_autres,
+          status: 'Actif'
+        };
 
-        // 3. Create the user in Auth
-        const { error: authError } = await adminAuthClient.auth.signUp({
-          email: loginEmail,
-          password: generatedPassword,
+        // 3. Appel de l'API Backend pour créer le compte et insérer en DB simultanément
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/api/users/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: loginEmail,
+            password: generatedPassword,
+            userData: newMemberData
+          })
         });
 
-        if (authError) {
-          console.error("Auth Error:", authError);
-          if (authError.message.includes('already registered')) {
+        const data = await response.json();
+
+        if (!response.ok) {
+          if (response.status === 409) {
             alert(`Impossible de créer le membre : L'adresse email "${loginEmail}" est déjà utilisée par un autre compte.`);
             setIsSubmitting(false);
             return;
           }
-          throw new Error(`Erreur Auth: ${authError.message}`);
+          throw new Error(data.message || 'Erreur lors de la création du membre');
         }
-
-        // 3.bis TEST INTERNE DE CONNEXION POUR DEBUG
-        const { error: testLoginError } = await adminAuthClient.auth.signInWithPassword({
-          email: loginEmail,
-          password: generatedPassword
-        });
-        
-        let statutCreation = testLoginError ? `⚠️ Avertissement Supabase : ${testLoginError.message}` : `✅ Compte activé avec succès`;
-
-        // 4. Save in members table
-        const { error } = await supabase.from('members').insert([
-          {
-            dmk_id,
-            first_name: formData.first_name,
-            last_name: formData.last_name,
-            email: loginEmail,
-            phone: formData.phone || null,
-            role: formData.role,
-            sector: formData.sector || null,
-            sass_magal: formData.sass_magal,
-            sass_ziaar: formData.sass_ziaar,
-            sass_kst: formData.sass_kst,
-            sass_cahier: formData.sass_cahier,
-            sass_projets: formData.sass_projets,
-            sass_autres: formData.sass_autres,
-            status: 'Actif'
-          }
-        ]);
-
-        if (error) throw error;
         
         await logActivity('CRÉATION', 'MEMBRE', `Création du membre ${formData.first_name} ${formData.last_name} (${dmk_id})`, formData.sector || 'N/A');
         
@@ -320,7 +348,7 @@ const Members = () => {
           lastName: formData.last_name,
           email: loginEmail,
           password: generatedPassword,
-          status: statutCreation
+          status: `✅ Compte activé avec succès`
         });
       }
 
@@ -502,7 +530,10 @@ const Members = () => {
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-70" size={18} />
             <input 
-              type="text" 
+              type="search" 
+              name="dmk_members_search"
+              id="dmk_members_search"
+              autoComplete="new-password"
               placeholder="Rechercher par nom ou DMK-ID..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -577,6 +608,7 @@ const Members = () => {
                   <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Rôle</th>
                   <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Secteur</th>
                   <th className="px-6 py-4 uppercase tracking-wider text-[11px] text-right">Total Engagé</th>
+                  <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Mot de Passe</th>
                   <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Statut</th>
                   <th className="px-6 py-4 uppercase tracking-wider text-[11px] text-right">Actions</th>
                 </tr>
@@ -601,6 +633,28 @@ const Members = () => {
                     <td className="px-6 py-4 text-muted-foreground font-medium">{member.sector || '-'}</td>
                     <td className="px-6 py-4 text-right font-bold text-foreground">
                       {((member.sass_magal || 0) + (member.sass_ziaar || 0) + (member.sass_kst || 0) + (member.sass_cahier || 0) + (member.sass_projets || 0) + (member.sass_autres || 0)).toLocaleString('fr-FR')} F
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-mono text-sm font-medium">
+                          {revealedPasswords[member.id] || '••••••••'}
+                        </span>
+                        {!revealedPasswords[member.id] && (
+                          <button 
+                            onClick={() => {
+                              setRevealMemberId(member.id);
+                              setAdminEmail('');
+                              setAdminPassword('');
+                              setRevealError('');
+                              setRevealModalOpen(true);
+                            }}
+                            className="text-muted-foreground hover:text-primary transition-colors p-1"
+                            title="Afficher le mot de passe"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
@@ -635,6 +689,20 @@ const Members = () => {
                             <Power size={14} className={`mr-2.5 ${member.status === 'Actif' ? 'text-red-500' : 'text-emerald-500'}`} />
                             {member.status === 'Actif' ? 'Désactiver' : 'Activer'}
                           </button>
+                          <button 
+                            className="w-full text-left px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 flex items-center transition-colors"
+                            onClick={() => {
+                              setActiveDropdown(null);
+                              setResetMemberId(member.id);
+                              setAdminEmail('');
+                              setAdminPassword('');
+                              setResetNewPassword('');
+                              setResetError('');
+                              setResetModalOpen(true);
+                            }}
+                          >
+                            <Key size={14} className="mr-2.5 text-indigo-500" /> Modifier Mot de passe
+                          </button>
                           <div className="border-t border-border/50 my-1.5"></div>
                           <button 
                             className="w-full text-left px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-500/10 flex items-center transition-colors"
@@ -649,7 +717,7 @@ const Members = () => {
                 ))}
                 {filteredMembers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                       Aucun membre ne correspond à vos filtres.
                     </td>
                   </tr>
@@ -747,6 +815,257 @@ const Members = () => {
                   Terminer
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reveal Password Modal */}
+      {revealModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="bg-card w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-border/50 relative animate-in zoom-in-95 duration-200 hide-scrollbar">
+            <div className="sticky top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-orange-500 z-10"></div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-2 text-foreground">Vérification de sécurité</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Pour afficher ce mot de passe, veuillez entrer vos identifiants administrateur.
+              </p>
+              
+              {revealError && (
+                <div className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm mb-5 border border-red-100 dark:border-red-500/20 font-medium flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {revealError}
+                </div>
+              )}
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!adminEmail || !adminPassword) {
+                  setRevealError('Veuillez remplir tous les champs');
+                  return;
+                }
+
+                setIsRevealing(true);
+                setRevealError('');
+                try {
+                  // Utilisation de fetch brut pour vérifier le mot de passe sans polluer l'état Supabase global
+                  const authResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({
+                      email: adminEmail,
+                      password: adminPassword,
+                    }),
+                  });
+                  
+                  if (!authResponse.ok) {
+                    throw new Error('Identifiants incorrects ou accès refusé');
+                  }
+
+                  const { data, error: fetchError } = await supabase
+                    .from('members')
+                    .select('password')
+                    .eq('id', revealMemberId)
+                    .single();
+                  
+                  if (fetchError) throw new Error("Impossible de récupérer le mot de passe");
+                  
+                  const memberPass = data.password || 'Aucun mot de passe (Ancien membre)';
+                  
+                  setRevealedPasswords(prev => ({ ...prev, [revealMemberId!]: memberPass }));
+                  setRevealModalOpen(false);
+                } catch (err: any) {
+                  setRevealError(err.message);
+                } finally {
+                  setIsRevealing(false);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 text-foreground">Email Administrateur</label>
+                    <input 
+                      type="email" 
+                      id="admin_verify_email"
+                      name="admin_verify_email"
+                      autoComplete="username"
+                      value={adminEmail} 
+                      onChange={e => setAdminEmail(e.target.value)} 
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground"
+                      placeholder="admin@dmk.sn"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 text-foreground">Mot de passe Administrateur</label>
+                    <input 
+                      type="password" 
+                      id="admin_verify_password"
+                      name="admin_verify_password"
+                      autoComplete="current-password"
+                      value={adminPassword} 
+                      onChange={e => setAdminPassword(e.target.value)} 
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-6 mt-2 border-t border-border/50">
+                    <button 
+                      type="button"
+                      onClick={() => setRevealModalOpen(false)}
+                      className="px-5 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground rounded-xl transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={isRevealing}
+                      className="bg-gradient-to-r from-red-500 to-orange-600 text-white px-5 py-2.5 text-sm font-semibold rounded-xl flex items-center hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {isRevealing ? <Loader2 size={16} className="animate-spin mr-2" /> : <Shield size={16} className="mr-2" />}
+                      Vérifier et Afficher
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+          <div className="bg-card w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl border border-border/50 relative animate-in zoom-in-95 duration-200 hide-scrollbar">
+            <div className="sticky top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-indigo-500 z-10"></div>
+            <div className="p-6">
+              <h3 className="text-xl font-bold mb-2 text-foreground flex items-center">
+                <Key size={20} className="mr-2 text-indigo-500" />
+                Modifier le Mot de Passe
+              </h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Cela modifiera le mot de passe du membre et le déconnectera automatiquement de tous ses appareils actuels.
+              </p>
+              
+              {resetError && (
+                <div className="bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm mb-5 border border-red-100 dark:border-red-500/20 font-medium flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {resetError}
+                </div>
+              )}
+
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!adminEmail || !adminPassword || !resetNewPassword) {
+                  setResetError('Veuillez remplir tous les champs');
+                  return;
+                }
+
+                setIsResetting(true);
+                setResetError('');
+                try {
+                  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                  const response = await fetch(`${API_URL}/api/users/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      adminEmail,
+                      adminPassword,
+                      targetUserId: resetMemberId,
+                      newPassword: resetNewPassword
+                    })
+                  });
+
+                  if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || errData.message || 'Erreur lors de la réinitialisation');
+                  }
+
+                  setRevealedPasswords(prev => {
+                    if (prev[resetMemberId!]) {
+                      return { ...prev, [resetMemberId!]: resetNewPassword };
+                    }
+                    return prev;
+                  });
+
+                  alert("Mot de passe modifié avec succès ! L'utilisateur a été déconnecté de tous ses appareils.");
+                  setResetModalOpen(false);
+                } catch (err: any) {
+                  setResetError(err.message);
+                } finally {
+                  setIsResetting(false);
+                }
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 text-foreground">Nouveau Mot de Passe (pour le membre)</label>
+                    <input 
+                      type="text" 
+                      id="new_member_password"
+                      name="new_member_password"
+                      autoComplete="new-password"
+                      value={resetNewPassword} 
+                      onChange={e => setResetNewPassword(e.target.value)} 
+                      className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground"
+                      placeholder="Ex: DMK-12345"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-border/50">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Vérification Administrateur</p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold mb-1.5 text-foreground">Votre Email Admin</label>
+                        <input 
+                          type="email" 
+                          id="admin_reset_email"
+                          name="admin_reset_email"
+                          autoComplete="username"
+                          value={adminEmail} 
+                          onChange={e => setAdminEmail(e.target.value)} 
+                          className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground"
+                          placeholder="admin@dmk.sn"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-1.5 text-foreground">Votre Mot de Passe Admin</label>
+                        <input 
+                          type="password" 
+                          id="admin_reset_password"
+                          name="admin_reset_password"
+                          autoComplete="current-password"
+                          value={adminPassword} 
+                          onChange={e => setAdminPassword(e.target.value)} 
+                          className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all text-foreground"
+                          placeholder="••••••••"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-6 mt-2 border-t border-border/50">
+                    <button 
+                      type="button"
+                      onClick={() => setResetModalOpen(false)}
+                      className="px-5 py-2.5 text-sm font-semibold text-muted-foreground hover:bg-secondary hover:text-foreground rounded-xl transition-colors"
+                    >
+                      Annuler
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={isResetting}
+                      className="bg-gradient-to-r from-primary to-indigo-600 text-white px-5 py-2.5 text-sm font-semibold rounded-xl flex items-center hover:opacity-90 transition-all disabled:opacity-50 shadow-sm"
+                    >
+                      {isResetting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Shield size={16} className="mr-2" />}
+                      Modifier et Déconnecter
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         </div>
