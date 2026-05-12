@@ -47,7 +47,7 @@ const Login = () => {
         <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tl from-purple-500/20 to-primary/10 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
 
-      <div className="relative z-10 w-full max-w-[420px] max-h-[95vh] overflow-y-auto custom-scrollbar p-10 bg-card/70 dark:bg-card/40 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+      <div className="relative z-10 w-full max-w-[420px] max-h-[95vh] overflow-y-auto custom-scrollbar p-10 bg-card/70 dark:bg-card/40 border border-white/20 dark:border-white/10 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
         
         {/* Logo & Header */}
         <div className="text-center mb-10">

@@ -295,7 +295,7 @@ const Members = () => {
         
         // 1. Generate auth credentials
         const generatedPassword = generatePassword();
-        let loginEmail = formData.email ? formData.email.trim().toLowerCase() : `${dmk_id.toLowerCase()}@dmk.sn`;
+        const loginEmail = formData.email ? formData.email.trim().toLowerCase() : `${dmk_id.toLowerCase()}@dmk.sn`;
 
         // 2. Préparation des données du membre
         const newMemberData = {
@@ -758,7 +758,7 @@ const Members = () => {
       {/* Success Modal for New Member Credentials */}
       {newMemberCredentials && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
-          <div className="bg-card/90 backdrop-blur-xl w-full max-w-md rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-white/20 dark:border-white/10 overflow-hidden relative animate-in zoom-in-95 duration-300">
+          <div className="bg-card/90 w-full max-w-md rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border border-white/20 dark:border-white/10 overflow-hidden relative animate-in zoom-in-95 duration-300">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 to-emerald-600 z-10"></div>
             
             <div className="p-8 text-center max-h-[85vh] overflow-y-auto custom-scrollbar">

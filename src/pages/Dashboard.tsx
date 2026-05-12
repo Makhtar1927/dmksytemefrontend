@@ -13,7 +13,7 @@ const StatCard = ({ title, value, icon: Icon, trend, trendValue, gradientClass }
         <p className="text-sm font-semibold text-muted-foreground/80 mb-1 uppercase tracking-wider">{title}</p>
         <h3 className="text-3xl font-extrabold text-foreground tracking-tight">{value}</h3>
       </div>
-      <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary backdrop-blur-sm border border-primary/20 shadow-inner">
+      <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner">
         <Icon size={28} strokeWidth={1.5} />
       </div>
     </div>
@@ -123,7 +123,7 @@ const Dashboard = () => {
       const data = payload[0].payload;
       const isPositive = data.growth >= 0;
       return (
-        <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-gray-100 dark:border-gray-800 p-5 rounded-2xl shadow-2xl">
+        <div className="bg-white/95 dark:bg-gray-900/95 border border-gray-100 dark:border-gray-800 p-5 rounded-2xl shadow-2xl">
           <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-3 tracking-widest uppercase">{label}</p>
           <div className="flex items-end gap-4">
             <div className="flex items-center gap-3">

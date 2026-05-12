@@ -69,7 +69,7 @@ const Transactions = () => {
       if (incomesError) throw incomesError;
       if (expensesError) throw expensesError;
 
-      let history: Transaction[] = [];
+      const history: Transaction[] = [];
 
       if (contribs) {
         contribs.forEach(c => {
