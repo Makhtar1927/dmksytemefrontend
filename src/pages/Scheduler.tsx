@@ -204,7 +204,7 @@ const Scheduler = () => {
               <h2 className="text-xl font-bold text-foreground">
                 {editingEventId ? "Modifier l'Événement" : "Nouvel Événement"}
               </h2>
-              <button onClick={() => {
+              <button type="button" onClick={() => {
                 setIsModalOpen(false);
                 setEditingEventId(null);
                 setFormData({ title: '', event_type: 'Dahira', event_date: '', location: '', description: '', maps_link: '' });

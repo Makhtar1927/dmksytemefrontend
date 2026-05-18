@@ -399,7 +399,7 @@ const Transactions = () => {
               <h2 className="text-xl font-bold text-foreground flex items-center">
                 <Shield size={20} className="mr-2 text-primary" /> Validation Administrateur
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>

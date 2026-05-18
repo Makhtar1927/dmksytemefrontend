@@ -13,6 +13,16 @@ type Member = {
   role: string;
   sector: string;
   status: string;
+  birth_date?: string;
+  birth_place?: string;
+  address?: string;
+  cni_number?: string;
+  cni_issue_date?: string;
+  cni_expiry_date?: string;
+  blood_type?: string;
+  gender?: string;
+  join_date?: string;
+  profession?: string;
   sass_magal?: number;
   sass_ziaar?: number;
   sass_kst?: number;
@@ -62,6 +72,16 @@ const Members = () => {
     phone: '',
     role: 'Membre Simple',
     sector: '',
+    birth_date: '',
+    birth_place: '',
+    address: '',
+    cni_number: '',
+    cni_issue_date: '',
+    cni_expiry_date: '',
+    blood_type: '',
+    gender: '',
+    join_date: '',
+    profession: '',
     sass_magal: 0,
     sass_ziaar: 0,
     sass_kst: 0,
@@ -199,6 +219,7 @@ const Members = () => {
     setEditingMember(null);
     setFormData({
       first_name: '', last_name: '', email: '', phone: '', role: 'Membre Simple', sector: '',
+      birth_date: '', birth_place: '', address: '', cni_number: '', cni_issue_date: '', cni_expiry_date: '', blood_type: '', gender: '', join_date: '', profession: '',
       sass_magal: 0, sass_ziaar: 0, sass_kst: 0, sass_cahier: 0, sass_projets: 0, sass_autres: 0
     });
     setIsModalOpen(true);
@@ -214,6 +235,16 @@ const Members = () => {
       phone: member.phone || '',
       role: member.role,
       sector: member.sector || '',
+      birth_date: member.birth_date || '',
+      birth_place: member.birth_place || '',
+      address: member.address || '',
+      cni_number: member.cni_number || '',
+      cni_issue_date: member.cni_issue_date || '',
+      cni_expiry_date: member.cni_expiry_date || '',
+      blood_type: member.blood_type || '',
+      gender: member.gender || '',
+      join_date: member.join_date || '',
+      profession: member.profession || '',
       sass_magal: member.sass_magal || 0,
       sass_ziaar: member.sass_ziaar || 0,
       sass_kst: member.sass_kst || 0,
@@ -277,6 +308,16 @@ const Members = () => {
             phone: formData.phone || null,
             role: formData.role,
             sector: formData.sector || null,
+            birth_date: formData.birth_date || null,
+            birth_place: formData.birth_place || null,
+            address: formData.address || null,
+            cni_number: formData.cni_number || null,
+            cni_issue_date: formData.cni_issue_date || null,
+            cni_expiry_date: formData.cni_expiry_date || null,
+            blood_type: formData.blood_type || null,
+            gender: formData.gender || null,
+            join_date: formData.join_date || null,
+            profession: formData.profession || null,
             sass_magal: formData.sass_magal,
             sass_ziaar: formData.sass_ziaar,
             sass_kst: formData.sass_kst,
@@ -305,6 +346,16 @@ const Members = () => {
           phone: formData.phone || null,
           role: formData.role,
           sector: formData.sector || null,
+          birth_date: formData.birth_date || null,
+          birth_place: formData.birth_place || null,
+          address: formData.address || null,
+          cni_number: formData.cni_number || null,
+          cni_issue_date: formData.cni_issue_date || null,
+          cni_expiry_date: formData.cni_expiry_date || null,
+          blood_type: formData.blood_type || null,
+          gender: formData.gender || null,
+          join_date: formData.join_date || null,
+          profession: formData.profession || null,
           sass_magal: formData.sass_magal,
           sass_ziaar: formData.sass_ziaar,
           sass_kst: formData.sass_kst,
@@ -356,6 +407,7 @@ const Members = () => {
       setEditingMember(null);
       setFormData({
         first_name: '', last_name: '', email: '', phone: '', role: 'Membre Simple', sector: '',
+        birth_date: '', birth_place: '', address: '', cni_number: '', cni_issue_date: '', cni_expiry_date: '', blood_type: '', gender: '', join_date: '', profession: '',
         sass_magal: 0, sass_ziaar: 0, sass_kst: 0, sass_cahier: 0, sass_projets: 0, sass_autres: 0
       });
       fetchMembers();
@@ -438,7 +490,7 @@ const Members = () => {
               <h2 className="text-xl font-bold text-foreground">
                 {editingMember ? 'Modifier le Membre' : 'Nouveau Membre'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
                 <X size={20} />
               </button>
             </div>
@@ -481,6 +533,66 @@ const Members = () => {
                 </div>
               </div>
               
+              <div className="pt-4 border-t border-border mt-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Informations Personnelles & Administratives</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Date de naissance</label>
+                    <input name="birth_date" value={formData.birth_date || ''} onChange={handleInputChange} type="date" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Lieu de naissance</label>
+                    <input name="birth_place" value={formData.birth_place || ''} onChange={handleInputChange} type="text" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Profession</label>
+                    <input name="profession" value={formData.profession || ''} onChange={handleInputChange} type="text" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Adresse complète</label>
+                    <input name="address" value={formData.address || ''} onChange={handleInputChange} type="text" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Numéro CNI</label>
+                    <input name="cni_number" value={formData.cni_number || ''} onChange={handleInputChange} type="text" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Délivrance CNI</label>
+                    <input name="cni_issue_date" value={formData.cni_issue_date || ''} onChange={handleInputChange} type="date" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Expiration CNI</label>
+                    <input name="cni_expiry_date" value={formData.cni_expiry_date || ''} onChange={handleInputChange} type="date" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Groupe Sanguin</label>
+                    <select name="blood_type" value={formData.blood_type || ''} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm">
+                      <option value="">Non spécifié</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Date d'adhésion</label>
+                    <input name="join_date" value={formData.join_date || ''} onChange={handleInputChange} type="date" className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Sexe</label>
+                    <select name="gender" value={formData.gender || ''} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-lg px-2 py-1.5 text-foreground focus:ring-2 focus:ring-primary outline-none text-sm">
+                      <option value="">Non spécifié</option>
+                      <option value="Masculin">Masculin</option>
+                      <option value="Féminin">Féminin</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-border mt-4">
                 <h3 className="text-sm font-semibold text-foreground mb-3">Engagements Financiers (Prévisions en FCFA)</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

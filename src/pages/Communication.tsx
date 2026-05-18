@@ -219,6 +219,56 @@ const Communication = () => {
             }
           }
         }
+
+        // =========================================================
+        // ENVOI DES NOTIFICATIONS PUSH WEB (PWA)
+        // =========================================================
+        try {
+          let pushQuery = supabase.from('push_subscriptions').select('member_id, subscription');
+          
+          if (formData.target_audience === 'Bureau Uniquement') {
+             // Il faut d'abord récupérer les ID des membres du bureau
+             const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière'];
+             const { data: bMembers } = await supabase.from('members').select('id').in('role', bureauRoles);
+             const bIds = bMembers?.map(m => m.id) || [];
+             if(bIds.length > 0) pushQuery = pushQuery.in('member_id', bIds);
+             else pushQuery = pushQuery.eq('member_id', 'none'); // Ne rien envoyer
+          } else if (formData.target_audience === 'Secteur Spécifique') {
+             const { data: sMembers } = await supabase.from('members').select('id').eq('sector', selectedSector);
+             const sIds = sMembers?.map(m => m.id) || [];
+             if(sIds.length > 0) pushQuery = pushQuery.in('member_id', sIds);
+             else pushQuery = pushQuery.eq('member_id', 'none');
+          } else if (formData.target_audience === 'Membre Spécifique') {
+            pushQuery = pushQuery.eq('member_id', selectedMember);
+          }
+
+          const { data: webPushSubs } = await pushQuery;
+          const subscriptions = webPushSubs?.map(s => s.subscription) || [];
+
+          if (subscriptions.length > 0) {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const productionUrl = 'https://dmksytemebackend.onrender.com';
+            const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+
+            await fetch(`${baseUrl}/api/notifications/web-push-send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                subscriptions,
+                payload: {
+                  title: "Nouvelle Alerte DMK",
+                  body: formData.content,
+                  data: {
+                    dateOfArrival: Date.now(),
+                    primaryKey: '2'
+                  }
+                }
+              }),
+            });
+          }
+        } catch (webPushErr) {
+          console.warn("Erreur lors de l'envoi des notifications Web Push:", webPushErr);
+        }
       }
       // ---------------------------------------------------------
 

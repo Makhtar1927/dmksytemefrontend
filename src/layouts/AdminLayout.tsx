@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   Activity,
   ShieldCheck,
-  Banknote
+  Banknote,
+  CreditCard
 } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,6 +31,7 @@ const AdminLayout = () => {
   const navigation = [
     { name: 'Vue d\'ensemble', href: '/', icon: LayoutDashboard },
     { name: 'Membres', href: '/membres', icon: Users },
+    { name: 'Cartes Membres', href: '/cartes', icon: CreditCard },
     { name: 'Transactions', href: '/transactions', icon: Banknote },
     { name: 'Planificateur', href: '/planificateur', icon: Calendar },
     { name: 'Communication', href: '/communication', icon: MessageSquare },

@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import Journal from './pages/Journal';
 import Transactions from './pages/Transactions';
 import Login from './pages/Login';
+import CardsManagement from './pages/CardsManagement';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             }>
               <Route index element={<Dashboard />} />
               <Route path="membres" element={<Members />} />
+              <Route path="cartes" element={<CardsManagement />} />
               <Route path="transactions" element={<Transactions />} />
               <Route path="planificateur" element={<Scheduler />} />
               <Route path="communication" element={<Communication />} />

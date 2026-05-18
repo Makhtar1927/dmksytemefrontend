@@ -591,7 +591,7 @@ const Settings = () => {
                   <Smartphone className="mr-2 text-primary" size={24} />
                   Configuration 2FA
                 </h2>
-                <button onClick={() => setShow2FAModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
+                <button type="button" onClick={() => setShow2FAModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
                   <X size={20} />
                 </button>
               </div>
@@ -646,7 +646,7 @@ const Settings = () => {
                   <AlertTriangle className="mr-2" size={24} />
                   Validation Requise
                 </h2>
-                <button onClick={() => setShowResetModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
+                <button type="button" onClick={() => setShowResetModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
                   <X size={20} />
                 </button>
               </div>
