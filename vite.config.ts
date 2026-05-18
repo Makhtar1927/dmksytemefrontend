@@ -11,7 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
-      includeAssets: ['icon.png'],
+      includeAssets: ['dmk-icon.png'],
       manifest: {
         name: 'DMK Platform Admin',
         short_name: 'DMK Admin',
@@ -22,12 +22,12 @@ export default defineConfig({
         orientation: 'portrait',
         icons: [
           {
-            src: '/icon.png',
+            src: '/dmk-icon.png',
             sizes: '192x192',
             type: 'image/png'
           },
           {
-            src: '/icon.png',
+            src: '/dmk-icon.png',
             sizes: '512x512',
             type: 'image/png'
           }
