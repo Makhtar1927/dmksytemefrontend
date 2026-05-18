@@ -14,7 +14,6 @@ import {
   XCircle,
   Clock
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 export default function CardsManagement() {
   const [activeTab, setActiveTab] = useState<'view' | 'manage'>('view');
@@ -26,10 +25,9 @@ export default function CardsManagement() {
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [uploadingMemberId, setUploadingMemberId] = useState<string | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null!);
   const containerRef = useRef<HTMLDivElement>(null);
   const [cardScale, setCardScale] = useState(1);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
@@ -98,7 +96,7 @@ export default function CardsManagement() {
       const dataUrl = await htmlToImage.toPng(cardRef.current, { 
         quality: 1, 
         pixelRatio: 2,
-        backgroundColor: null
+        backgroundColor: undefined
       });
       
       const link = document.createElement('a');
