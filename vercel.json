@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://res.cloudinary.com https://*.supabase.co https://*.supabase.in; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://qxeqaqmsanfjeekybilp.supabase.co wss://qxeqaqmsanfjeekybilp.supabase.co https://*.supabase.co wss://*.supabase.co https://*.supabase.in https://pay.wave.com http://localhost:5000; frame-src 'self' https://pay.wave.com; object-src 'none'; base-uri 'self'; form-action 'self' https://pay.wave.com;"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://res.cloudinary.com https://*.supabase.co https://*.supabase.in https://placehold.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://qxeqaqmsanfjeekybilp.supabase.co wss://qxeqaqmsanfjeekybilp.supabase.co https://*.supabase.co wss://*.supabase.co https://*.supabase.in https://dmksytemebackend.onrender.com http://localhost:5000; frame-src 'self' https://pay.wave.com; object-src 'none'; base-uri 'self'; form-action 'self' https://pay.wave.com;"
         },
         {
           "key": "X-Content-Type-Options",
