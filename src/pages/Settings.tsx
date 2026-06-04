@@ -4,6 +4,55 @@ import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
 
+interface Member {
+  id: string;
+  first_name: string;
+  last_name: string;
+  dmk_id: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  sector?: string;
+  status?: string;
+  birth_date?: string;
+  birth_place?: string;
+  address?: string;
+  cni_number?: string;
+  cni_issue_date?: string;
+  cni_expiry_date?: string;
+  blood_type?: string;
+  gender?: string;
+  join_date?: string;
+  profession?: string;
+  sass_magal?: number;
+  sass_ziaar?: number;
+  sass_kst?: number;
+  sass_cahier?: number;
+  sass_projets?: number;
+  sass_autres?: number;
+  marital_status?: string;
+  created_at?: string;
+}
+
+interface Contribution {
+  id: string;
+  member_id: string;
+  amount: number;
+  payment_date: string;
+  status: string;
+  sass_type?: string;
+  payment_method?: string;
+  members?: Member | null;
+}
+
+interface Expense {
+  id: string;
+  amount: number;
+  expense_date: string;
+  beneficiary: string;
+  reason: string;
+}
+
 const Settings = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donnees');
@@ -83,7 +132,7 @@ const Settings = () => {
   const exportMembersToCSV = async () => {
     setIsExporting(true);
     try {
-      let allMembers: any[] = [];
+      let allMembers: Member[] = [];
       let from = 0;
       let hasMore = true;
 
@@ -98,7 +147,7 @@ const Settings = () => {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allMembers = [...allMembers, ...data];
+          allMembers = [...allMembers, ...data as Member[]];
           from += 1000;
           if (data.length < 1000) hasMore = false;
         } else {
@@ -113,22 +162,70 @@ const Settings = () => {
 
       const data = allMembers;
 
-      const headers = ['DMK_ID', 'Prenom', 'Nom', 'Email', 'Telephone', 'Secteur', 'Role', 'Status', 'Sexe', 'Situation_Matrimoniale', 'Metier', 'Date_Inscription'];
+      const headers = [
+        'dmk_id',
+        'first_name',
+        'last_name',
+        'email',
+        'phone',
+        'role',
+        'sector',
+        'status',
+        'birth_date',
+        'birth_place',
+        'address',
+        'cni_number',
+        'cni_issue_date',
+        'cni_expiry_date',
+        'blood_type',
+        'gender',
+        'join_date',
+        'profession',
+        'sass_magal',
+        'sass_ziaar',
+        'sass_kst',
+        'sass_cahier',
+        'sass_projets',
+        'sass_autres',
+        'marital_status',
+        'created_at'
+      ];
+
+      const escapeCSV = (val: unknown) => {
+        if (val === undefined || val === null) return '""';
+        const str = String(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
       const csvContent = [
         headers.join(','),
         ...data.map(m => [
-          m.dmk_id,
-          `"${m.first_name || ''}"`,
-          `"${m.last_name || ''}"`,
-          `"${m.email || ''}"`,
-          `"${m.phone || ''}"`,
-          `"${m.sector || ''}"`,
-          `"${m.role || ''}"`,
-          `"${m.status || ''}"`,
-          `"${m.gender || ''}"`,
-          `"${m.marital_status || ''}"`,
-          `"${m.profession || ''}"`,
-          m.created_at ? format(new Date(m.created_at), 'yyyy-MM-dd') : ''
+          escapeCSV(m.dmk_id),
+          escapeCSV(m.first_name),
+          escapeCSV(m.last_name),
+          escapeCSV(m.email),
+          escapeCSV(m.phone),
+          escapeCSV(m.role),
+          escapeCSV(m.sector),
+          escapeCSV(m.status),
+          escapeCSV(m.birth_date),
+          escapeCSV(m.birth_place),
+          escapeCSV(m.address),
+          escapeCSV(m.cni_number),
+          escapeCSV(m.cni_issue_date),
+          escapeCSV(m.cni_expiry_date),
+          escapeCSV(m.blood_type),
+          escapeCSV(m.gender),
+          escapeCSV(m.join_date),
+          escapeCSV(m.profession),
+          escapeCSV(m.sass_magal !== undefined && m.sass_magal !== null ? m.sass_magal : 0),
+          escapeCSV(m.sass_ziaar !== undefined && m.sass_ziaar !== null ? m.sass_ziaar : 0),
+          escapeCSV(m.sass_kst !== undefined && m.sass_kst !== null ? m.sass_kst : 0),
+          escapeCSV(m.sass_cahier !== undefined && m.sass_cahier !== null ? m.sass_cahier : 0),
+          escapeCSV(m.sass_projets !== undefined && m.sass_projets !== null ? m.sass_projets : 0),
+          escapeCSV(m.sass_autres !== undefined && m.sass_autres !== null ? m.sass_autres : 0),
+          escapeCSV(m.marital_status),
+          escapeCSV(m.created_at ? format(new Date(m.created_at), 'yyyy-MM-dd') : '')
         ].join(','))
       ].join('\n');
 
@@ -141,8 +238,8 @@ const Settings = () => {
       link.click();
       document.body.removeChild(link);
       
-    } catch (err: any) {
-      alert("Erreur lors de l'export: " + err.message);
+    } catch (err) {
+      alert("Erreur lors de l'export: " + (err as Error).message);
     } finally {
       setIsExporting(false);
     }
@@ -152,7 +249,7 @@ const Settings = () => {
   const exportFinancialReportPDF = async () => {
     setIsExporting(true);
     try {
-      let allContribs: any[] = [];
+      let allContribs: Contribution[] = [];
       let from = 0;
       let hasMore = true;
 
@@ -167,7 +264,7 @@ const Settings = () => {
         if (error) throw error;
 
         if (data && data.length > 0) {
-          allContribs = [...allContribs, ...data];
+          allContribs = [...allContribs, ...data as Contribution[]];
           from += 1000;
           if (data.length < 1000) hasMore = false;
         } else {
@@ -175,65 +272,338 @@ const Settings = () => {
         }
       }
 
-      const data = allContribs;
+      let allExpenses: Expense[] = [];
+      from = 0;
+      hasMore = true;
+
+      // Boucle d'aspiration pour les dépenses
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('treasury_expenses')
+          .select('*')
+          .order('expense_date', { ascending: false })
+          .range(from, from + 999);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allExpenses = [...allExpenses, ...data as Expense[]];
+          from += 1000;
+          if (data.length < 1000) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const totalIncomes = allContribs
+        .filter(c => c.status === 'Validé')
+        .reduce((sum, c) => sum + Number(c.amount), 0);
+
+      const totalExpenses = allExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      const netBalance = totalIncomes - totalExpenses;
 
       let html = `
         <html>
           <head>
             <title>Rapport Annuel - Trésorerie DMK</title>
             <style>
-              body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-              h1 { color: #1e3a8a; text-align: center; }
-              .header { text-align: center; margin-bottom: 30px; }
-              table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f3f4f6; }
-              .total { margin-top: 20px; font-size: 1.2em; font-weight: bold; text-align: right; }
+              body {
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                margin: 40px;
+                color: #1e293b;
+                background-color: #fff;
+              }
+              .header-container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 3px solid #1e3a8a;
+                padding-bottom: 15px;
+                margin-bottom: 30px;
+              }
+              .logo-area {
+                text-align: left;
+              }
+              .logo-title {
+                font-size: 24px;
+                font-weight: 800;
+                color: #1e3a8a;
+                margin: 0;
+                letter-spacing: -0.5px;
+              }
+              .logo-subtitle {
+                font-size: 12px;
+                font-weight: 600;
+                color: #475569;
+                margin: 4px 0 0 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+              }
+              .meta-area {
+                text-align: right;
+                font-size: 11px;
+                color: #64748b;
+              }
+              .meta-area p {
+                margin: 2px 0;
+              }
+              .report-title-container {
+                text-align: center;
+                margin-bottom: 30px;
+              }
+              .report-title {
+                font-size: 20px;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 0;
+                text-transform: uppercase;
+              }
+              .report-period {
+                font-size: 13px;
+                color: #475569;
+                margin-top: 5px;
+                font-weight: 600;
+              }
+              .metrics-row {
+                display: flex;
+                gap: 15px;
+                margin-bottom: 35px;
+              }
+              .metric-card {
+                flex: 1;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                padding: 15px;
+                background-color: #f8fafc;
+              }
+              .metric-label {
+                font-size: 10px;
+                font-weight: 700;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+              }
+              .metric-value {
+                font-size: 20px;
+                font-weight: 800;
+                margin-top: 5px;
+              }
+              .metric-value.income {
+                color: #16a34a;
+              }
+              .metric-value.expense {
+                color: #dc2626;
+              }
+              .metric-value.net {
+                color: #2563eb;
+              }
+              .section-title {
+                font-size: 14px;
+                font-weight: 800;
+                color: #1e3a8a;
+                border-bottom: 2px solid #cbd5e1;
+                padding-bottom: 6px;
+                margin-top: 30px;
+                margin-bottom: 12px;
+                text-transform: uppercase;
+              }
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 25px;
+                font-size: 11px;
+              }
+              th {
+                background-color: #f1f5f9;
+                color: #334155;
+                font-weight: 700;
+                text-align: left;
+                padding: 8px 10px;
+                border-bottom: 2px solid #cbd5e1;
+              }
+              td {
+                padding: 8px 10px;
+                border-bottom: 1px solid #e2e8f0;
+                color: #334155;
+              }
+              tr:nth-child(even) td {
+                background-color: #f8fafc;
+              }
+              .text-right {
+                text-align: right;
+              }
+              .font-bold {
+                font-weight: 700;
+              }
+              .status-badge {
+                display: inline-block;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-size: 9px;
+                font-weight: 700;
+                text-transform: uppercase;
+              }
+              .status-badge.valide {
+                background-color: #dcfce7;
+                color: #15803d;
+              }
+              .status-badge.attente {
+                background-color: #fef9c3;
+                color: #a16207;
+              }
+              .status-badge.rejete {
+                background-color: #fee2e2;
+                color: #b91c1c;
+              }
+              .footer {
+                margin-top: 50px;
+                border-top: 1px solid #e2e8f0;
+                padding-top: 15px;
+                text-align: center;
+                font-size: 10px;
+                color: #94a3b8;
+              }
+              @media print {
+                body {
+                  margin: 15mm;
+                }
+                .metric-card {
+                  background-color: #f8fafc !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                th {
+                  background-color: #f1f5f9 !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                tr:nth-child(even) td {
+                  background-color: #f8fafc !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                .status-badge.valide {
+                  background-color: #dcfce7 !important;
+                  color: #15803d !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                .status-badge.attente {
+                  background-color: #fef9c3 !important;
+                  color: #a16207 !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+              }
             </style>
           </head>
           <body>
-            <div class="header">
-              <h1>Rapport Annuel des Transactions Financières</h1>
-              <p>Dahira Mafatihul Bichtri - Généré le : ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+            <div class="header-container">
+              <div class="logo-area">
+                <h1 class="logo-title">Daara Mawahiboul Khoudoss</h1>
+                <p class="logo-subtitle">Bureau Administratif et Financier</p>
+              </div>
+              <div class="meta-area">
+                <p><strong>Généré le :</strong> ${format(new Date(), 'dd/MM/yyyy HH:mm')}</p>
+                <p><strong>Type :</strong> Bilan Annuel Consolidé</p>
+              </div>
             </div>
+
+            <div class="report-title-container">
+              <h2 class="report-title">Rapport Financier Annuel</h2>
+              <div class="report-period">Année en cours (${new Date().getFullYear()})</div>
+            </div>
+
+            <div class="metrics-row">
+              <div class="metric-card">
+                <div class="metric-label">Total Entrées (Sass validés)</div>
+                <div class="metric-value income">+ ${totalIncomes.toLocaleString('fr-FR')} F</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Total Sorties (Dépenses)</div>
+                <div class="metric-value expense">- ${totalExpenses.toLocaleString('fr-FR')} F</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Solde Caisse Net</div>
+                <div class="metric-value net">${netBalance.toLocaleString('fr-FR')} F</div>
+              </div>
+            </div>
+
+            <div class="section-title">1. Entrées : Cotisations Sass</div>
             <table>
               <thead>
                 <tr>
                   <th>Date</th>
                   <th>ID Membre</th>
                   <th>Nom Complet</th>
-                  <th>Montant (FCFA)</th>
-                  <th>Méthode</th>
+                  <th>Rubrique</th>
+                  <th>Moyen</th>
                   <th>Statut</th>
+                  <th class="text-right">Montant</th>
                 </tr>
               </thead>
               <tbody>
       `;
 
-      let total = 0;
-      if (data && data.length > 0) {
-        data.forEach((c: any) => {
-          if (c.status === 'Validé') total += Number(c.amount);
+      if (allContribs.length > 0) {
+        allContribs.forEach((c) => {
+          const statusClass = c.status === 'Validé' ? 'valide' : (c.status === 'En attente' ? 'attente' : 'rejete');
+          const dateStr = c.payment_date ? format(new Date(c.payment_date), 'dd/MM/yyyy') : '-';
           html += `
             <tr>
-              <td>${format(new Date(c.payment_date), 'dd/MM/yyyy')}</td>
+              <td>${dateStr}</td>
               <td>${c.members?.dmk_id || '-'}</td>
-              <td>${c.members?.first_name || ''} ${c.members?.last_name || ''}</td>
-              <td>${Number(c.amount).toLocaleString()}</td>
+              <td class="font-bold">${c.members?.first_name || ''} ${c.members?.last_name || ''}</td>
+              <td>Sass ${c.sass_type || 'Général'}</td>
               <td>${c.payment_method || '-'}</td>
-              <td>${c.status || '-'}</td>
+              <td><span class="status-badge ${statusClass}">${c.status || '-'}</span></td>
+              <td class="text-right font-bold">${Number(c.amount).toLocaleString('fr-FR')} F</td>
             </tr>
           `;
         });
       } else {
-        html += `<tr><td colspan="6" style="text-align: center;">Aucune transaction trouvée</td></tr>`;
+        html += `<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 15px;">Aucune cotisation enregistrée</td></tr>`;
       }
 
       html += `
               </tbody>
             </table>
-            <div class="total">
-              Total des entrées validées : ${total.toLocaleString()} FCFA
+
+            <div class="section-title">2. Sorties : Décaissements / Dépenses</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Bénéficiaire</th>
+                  <th>Motif / Description</th>
+                  <th class="text-right">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      if (allExpenses.length > 0) {
+        allExpenses.forEach((e) => {
+          const dateStr = e.expense_date ? format(new Date(e.expense_date), 'dd/MM/yyyy') : '-';
+          html += `
+            <tr>
+              <td>${dateStr}</td>
+              <td class="font-bold">${e.beneficiary || '-'}</td>
+              <td>${e.reason || '-'}</td>
+              <td class="text-right font-bold" style="color: #dc2626;">-${Number(e.amount).toLocaleString('fr-FR')} F</td>
+            </tr>
+          `;
+        });
+      } else {
+        html += `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 15px;">Aucune dépense enregistrée</td></tr>`;
+      }
+
+      html += `
+              </tbody>
+            </table>
+
+            <div class="footer">
+              Ce document est un rapport officiel généré par le Système d'Information de la Daara Mawahiboul Khoudoss.
             </div>
             <script>
               window.onload = () => { window.print(); window.close(); }
@@ -248,8 +618,8 @@ const Settings = () => {
         printWindow.document.close();
       }
 
-    } catch (err: any) {
-      alert("Erreur lors de la génération du rapport: " + err.message);
+    } catch (err) {
+      alert("Erreur lors de la génération du rapport: " + (err as Error).message);
     } finally {
       setIsExporting(false);
     }
@@ -300,8 +670,8 @@ const Settings = () => {
       alert("Les transactions de l'année ont été réinitialisées avec succès.");
       setShowResetModal(false);
       
-    } catch (err: any) {
-      setResetError(err.message);
+    } catch (err) {
+      setResetError((err as Error).message);
     } finally {
       setIsResetting(false);
     }
@@ -591,7 +961,7 @@ const Settings = () => {
                   <Smartphone className="mr-2 text-primary" size={24} />
                   Configuration 2FA
                 </h2>
-                <button type="button" onClick={() => setShow2FAModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
+                <button type="button" onClick={() => setShow2FAModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary" aria-label="Fermer" title="Fermer">
                   <X size={20} />
                 </button>
               </div>
@@ -646,7 +1016,7 @@ const Settings = () => {
                   <AlertTriangle className="mr-2" size={24} />
                   Validation Requise
                 </h2>
-                <button type="button" onClick={() => setShowResetModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary">
+                <button type="button" onClick={() => setShowResetModal(false)} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-secondary" aria-label="Fermer" title="Fermer">
                   <X size={20} />
                 </button>
               </div>

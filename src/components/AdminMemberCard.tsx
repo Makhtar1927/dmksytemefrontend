@@ -3,7 +3,17 @@ import { ShieldCheck } from 'lucide-react';
 import { QRCode } from 'react-qr-code';
 
 interface AdminMemberCardProps {
-  memberInfo: any;
+  memberInfo: {
+    first_name: string;
+    last_name: string;
+    role?: string;
+    sector?: string;
+    address?: string;
+    dmk_id?: string;
+    blood_type?: string;
+    photo_url?: string;
+    card_payment_date?: string;
+  };
   cardRef?: React.RefObject<HTMLDivElement>;
 }
 
@@ -12,16 +22,15 @@ export default function AdminMemberCard({ memberInfo, cardRef }: AdminMemberCard
 
   const cardDataForQR = `ID:${memberInfo.dmk_id || 'N/A'} | Nom:${memberInfo.first_name} ${memberInfo.last_name} | Role:${memberInfo.role}`;
 
-  // Calcul de la date d'expiration (5 ans à partir d'aujourd'hui)
-  // Dans le vrai cas on devrait prendre la date d'achat de la carte, mais par défaut on met 5 ans après la date du jour ou date d'inscription
-  const issueDate = new Date();
+  // Calcul de la date d'expiration (5 ans à partir de la date d'obtention de la carte)
+  const issueDate = memberInfo.card_payment_date ? new Date(memberInfo.card_payment_date) : new Date();
   const expiryDate = new Date(issueDate);
   expiryDate.setFullYear(expiryDate.getFullYear() + 5);
   const expiryFormatted = expiryDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   return (
     <div 
-      ref={cardRef as any}
+      ref={cardRef}
       // On fixe une taille et un ratio précis pour s'assurer que la capture image (png) est toujours parfaite
       className="relative w-[800px] h-[504px] rounded-3xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/20 bg-gradient-to-br from-blue-900 via-indigo-800 to-slate-900 flex flex-col mx-auto"
       style={{ transformOrigin: 'top center', zoom: 1 }} // Utilise zoom/transform si nécessaire pour l'affichage, mais html2canvas prend la taille réelle

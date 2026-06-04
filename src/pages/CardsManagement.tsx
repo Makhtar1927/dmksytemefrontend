@@ -15,14 +15,32 @@ import {
   Clock
 } from 'lucide-react';
 
+interface CardMember {
+  id: string;
+  first_name: string;
+  last_name: string;
+  dmk_id: string;
+  email?: string;
+  phone?: string;
+  sector?: string;
+  role?: string;
+  status?: string;
+  gender?: string;
+  marital_status?: string;
+  profession?: string;
+  card_status?: string;
+  card_payment_date?: string;
+  is_card_blocked?: boolean;
+  photo_url?: string;
+}
+
 export default function CardsManagement() {
   const [activeTab, setActiveTab] = useState<'view' | 'manage'>('view');
-  const [members, setMembers] = useState<any[]>([]);
-  const [cardTransactions, setCardTransactions] = useState<any[]>([]);
+  const [members, setMembers] = useState<CardMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   
-  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [selectedMember, setSelectedMember] = useState<CardMember | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [uploadingMemberId, setUploadingMemberId] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null!);
@@ -31,7 +49,7 @@ export default function CardsManagement() {
 
   useEffect(() => {
     const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         const containerWidth = entry.contentRect.width;
         // Largeur de la carte = 800px. On laisse 40px de marge (20px de chaque côté)
         const newScale = Math.min(1, (containerWidth - 40) / 800);
@@ -45,10 +63,6 @@ export default function CardsManagement() {
     return () => observer.disconnect();
   }, [selectedMember, activeTab]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -60,17 +74,7 @@ export default function CardsManagement() {
       
       if (membersErr) throw membersErr;
 
-      // Récupération de toutes les transactions de cartes
-      const { data: transData, error: transErr } = await supabase
-        .from('sass_contributions')
-        .select('*')
-        .eq('sass_type', 'Achat Carte Membre')
-        .order('payment_date', { ascending: false });
-
-      if (transErr) throw transErr;
-
       setMembers(membersData || []);
-      setCardTransactions(transData || []);
     } catch (err) {
       console.error("Erreur lors de la récupération des données", err);
     } finally {
@@ -78,13 +82,31 @@ export default function CardsManagement() {
     }
   };
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, []);
+
   // Obtenir le statut de paiement pour un membre
-  const getCardStatus = (memberId: string) => {
-    const transaction = cardTransactions.find(t => t.member_id === memberId);
-    if (!transaction) return { label: 'Non demandée', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', icon: <XCircle size={14} className="mr-1" /> };
-    if (transaction.status === 'Validé') return { label: 'Payée', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: <CheckCircle size={14} className="mr-1" /> };
-    if (transaction.status === 'En attente') return { label: 'En attente', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: <Clock size={14} className="mr-1" /> };
-    return { label: 'Annulée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: <XCircle size={14} className="mr-1" /> };
+  const getCardStatus = (member: CardMember) => {
+    const dbCardStatus = member.card_status || 'unrequested';
+    const dbCardPaymentDate = member.card_payment_date;
+
+    if (dbCardStatus === 'active' && dbCardPaymentDate) {
+      // Vérifier si la carte est expirée (valide 5 ans)
+      const issueDate = new Date(dbCardPaymentDate);
+      const expiryDate = new Date(issueDate);
+      expiryDate.setFullYear(expiryDate.getFullYear() + 5);
+      
+      if (new Date() > expiryDate) {
+        return { label: 'Expirée (Re-payer)', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: <XCircle size={14} className="mr-1" /> };
+      }
+      return { label: 'Payée', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: <CheckCircle size={14} className="mr-1" /> };
+    }
+    if (dbCardStatus === 'pending') {
+      return { label: 'En attente', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: <Clock size={14} className="mr-1" /> };
+    }
+    return { label: 'Non demandée', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', icon: <XCircle size={14} className="mr-1" /> };
   };
 
   const handleDownloadCard = async () => {
@@ -134,7 +156,7 @@ export default function CardsManagement() {
     }
   };
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, member: any) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, member: CardMember) => {
     if (!e.target.files || e.target.files.length === 0 || !member?.email) return;
     const file = e.target.files[0];
     
@@ -165,9 +187,9 @@ export default function CardsManagement() {
       } else {
         throw new Error(data.message || 'Erreur lors de l\'upload');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erreur d'upload de photo:", err);
-      alert(err.message || "Une erreur est survenue lors de l'envoi de la photo.");
+      alert((err as Error).message || "Une erreur est survenue lors de l'envoi de la photo.");
     } finally {
       setUploadingMemberId(null);
       e.target.value = '';
@@ -247,7 +269,7 @@ export default function CardsManagement() {
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
                   {filteredMembers.map(member => {
-                    const status = getCardStatus(member.id);
+                    const status = getCardStatus(member);
                     return (
                       <button
                         key={member.id}
@@ -331,7 +353,7 @@ export default function CardsManagement() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredMembers.map((member) => {
-                    const status = getCardStatus(member.id);
+                    const status = getCardStatus(member);
                     const isBlocked = member.is_card_blocked === true;
 
                     return (
