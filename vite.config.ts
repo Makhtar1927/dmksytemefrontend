@@ -18,6 +18,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      showMaximumFileSizeToCacheInBytesWarning: true,
       includeAssets: ['dmk-icon.png'],
       manifest: {
         name: 'DMK Platform Admin',
