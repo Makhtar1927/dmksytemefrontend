@@ -47,6 +47,7 @@ export default defineConfig({
         // Nettoyer les anciens caches pour éviter les fuites de données
         cleanupOutdatedCaches: true,
         inlineWorkboxRuntime: true,
+        maximumFileSizeToCacheInBytes: 5242880,
       }
     })
   ],
