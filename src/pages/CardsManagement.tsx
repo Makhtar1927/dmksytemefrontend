@@ -32,6 +32,14 @@ interface CardMember {
   card_payment_date?: string;
   is_card_blocked?: boolean;
   photo_url?: string;
+  birth_date?: string;
+  birth_place?: string;
+  address?: string;
+  cni_number?: string;
+  cni_issue_date?: string;
+  join_date?: string;
+  created_at?: string;
+  blood_type?: string;
 }
 
 export default function CardsManagement() {
