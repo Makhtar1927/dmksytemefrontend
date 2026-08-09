@@ -95,25 +95,40 @@ const Communication = () => {
       const productionUrl = 'https://dmksytemebackend.onrender.com';
       const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
 
-      const response = await fetch(`${baseUrl}/api/communications/delete`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ communicationId: id })
-      });
+      let success = false;
 
-      const result = await response.json();
-      if (!response.ok || result.status === 'error') throw new Error(result.message);
+      // 1. Tentative API Backend
+      try {
+        const response = await fetch(`${baseUrl}/api/communications/delete`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ communicationId: id })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.status === 'success') {
+          success = true;
+        }
+      } catch (fetchErr) {
+        console.warn("Backend API indisponible, tentative suppression directe Supabase:", fetchErr);
+      }
+
+      // 2. Fallback Supabase direct si l'API backend échoue ou est bloquée par CORS
+      if (!success) {
+        const { error: sbErr } = await supabase.from('communications').delete().eq('id', id);
+        if (sbErr) throw sbErr;
+      }
 
       const commToDelete = history.find(h => h.id === id);
       await logActivity('SUPPRESSION', 'SYSTÈME', `Suppression d'une communication envoyée à: ${commToDelete?.target_audience || 'inconnu'}`);
 
-      setHistory(history.filter(h => h.id !== id));
+      setHistory(prev => prev.filter(h => h.id !== id));
     } catch (err: any) {
       console.error("Erreur suppression:", err);
-      alert("Erreur lors de la suppression: " + err.message);
+      alert("Erreur lors de la suppression: " + (err.message || "Impossible d'effectuer l'action."));
     }
   };
 
@@ -126,26 +141,41 @@ const Communication = () => {
       const productionUrl = 'https://dmksytemebackend.onrender.com';
       const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
 
-      const response = await fetch(`${baseUrl}/api/communications/update`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ communicationId: id, content: editContent })
-      });
+      let success = false;
 
-      const result = await response.json();
-      if (!response.ok || result.status === 'error') throw new Error(result.message);
+      // 1. Tentative API Backend
+      try {
+        const response = await fetch(`${baseUrl}/api/communications/update`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
+          },
+          body: JSON.stringify({ communicationId: id, content: editContent })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.status === 'success') {
+          success = true;
+        }
+      } catch (fetchErr) {
+        console.warn("Backend API indisponible, tentative modification directe Supabase:", fetchErr);
+      }
+
+      // 2. Fallback Supabase direct
+      if (!success) {
+        const { error: sbErr } = await supabase.from('communications').update({ content: editContent }).eq('id', id);
+        if (sbErr) throw sbErr;
+      }
 
       const commToUpdate = history.find(h => h.id === id);
       await logActivity('MODIFICATION', 'SYSTÈME', `Modification du message envoyé à: ${commToUpdate?.target_audience || 'inconnu'}`);
 
-      setHistory(history.map(h => h.id === id ? { ...h, content: editContent } : h));
+      setHistory(prev => prev.map(h => h.id === id ? { ...h, content: editContent } : h));
       setEditingId(null);
     } catch (err: any) {
       console.error("Erreur modification:", err);
-      alert("Erreur lors de la modification: " + err.message);
+      alert("Erreur lors de la modification: " + (err.message || "Impossible d'effectuer l'action."));
     }
   };
 
