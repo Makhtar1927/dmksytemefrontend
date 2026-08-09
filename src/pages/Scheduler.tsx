@@ -1,3 +1,4 @@
+// DMK Web Admin - Scheduler Module
 import React, { useEffect, useState, useCallback } from 'react';
 import { Calendar as CalendarIcon, Clock, Plus, Loader2, X, Edit2, Trash2, Video, Users, Link2, Sparkles, Settings, UserCheck, Radio, CheckCircle } from 'lucide-react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
