@@ -11,6 +11,7 @@ import Settings from './pages/Settings';
 import Journal from './pages/Journal';
 import Transactions from './pages/Transactions';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import CardsManagement from './pages/CardsManagement';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             
             <Route path="/" element={
               <ProtectedRoute>

@@ -25,6 +25,26 @@ const Communication = () => {
   const [selectedSector, setSelectedSector] = useState('');
   const [selectedMember, setSelectedMember] = useState('');
 
+  // Triggers Automatiques States (persisted in localStorage)
+  const [triggerSass, setTriggerSass] = useState(() => {
+    return localStorage.getItem('trigger_relance_sass') !== 'false';
+  });
+  const [triggerEvent, setTriggerEvent] = useState(() => {
+    return localStorage.getItem('trigger_rappel_event') !== 'false';
+  });
+
+  const toggleTriggerSass = () => {
+    const nextVal = !triggerSass;
+    setTriggerSass(nextVal);
+    localStorage.setItem('trigger_relance_sass', String(nextVal));
+  };
+
+  const toggleTriggerEvent = () => {
+    const nextVal = !triggerEvent;
+    setTriggerEvent(nextVal);
+    localStorage.setItem('trigger_rappel_event', String(nextVal));
+  };
+
   const SECTORS = [
     "Vaisselle", "Café", "Restauration", "Organisation", "Sonorisation",
     "Visuelle", "Bétail", "Cuisine", "Eau & Hygiène", "Protocole",
@@ -311,8 +331,6 @@ const Communication = () => {
                 className="w-full bg-background border border-border/50 rounded-xl px-4 py-3 text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition-all shadow-sm cursor-pointer"
               >
                 <option value="Push Application">Push Notification (App Mobile)</option>
-                <option value="SMS Urgence">Alerte SMS (Urgence)</option>
-                <option value="Email Système">Email Système</option>
               </select>
             </div>
             
@@ -457,23 +475,67 @@ const Communication = () => {
           </div>
 
           <div className="bg-card border border-border/50 rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-bold text-foreground mb-5 flex items-center">
+            <h2 className="text-lg font-bold text-foreground mb-1 flex items-center">
               <AlertTriangle className="mr-2.5 text-amber-500" size={20} />
               Triggers Automatiques
             </h2>
+            <p className="text-xs text-muted-foreground mb-4">Activation des rappels automatiques programmés</p>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3.5 bg-background border border-border/50 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer group">
-                <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Relance Sass (J-3)</span>
-                <div className="w-11 h-6 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full relative shadow-inner">
-                  <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm transform transition-transform"></div>
+              
+              {/* Trigger 1: Relance Sass (J-3) */}
+              <button
+                type="button"
+                onClick={toggleTriggerSass}
+                className="w-full flex items-center justify-between p-3.5 bg-background border border-border/50 rounded-xl hover:bg-secondary/40 transition-all cursor-pointer group text-left outline-none"
+              >
+                <div>
+                  <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors block">
+                    Relance Sass (J-3)
+                  </span>
+                  <span className={`text-[11px] font-medium transition-colors ${triggerSass ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-muted-foreground'}`}>
+                    {triggerSass ? '● Actif (Envoi auto 3j avant)' : '○ Désactivé'}
+                  </span>
                 </div>
-              </div>
-              <div className="flex items-center justify-between p-3.5 bg-background border border-border/50 rounded-xl hover:bg-secondary/50 transition-colors cursor-pointer group">
-                <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Rappel Événement (J-1)</span>
-                <div className="w-11 h-6 bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full relative shadow-inner">
-                  <div className="w-5 h-5 bg-white rounded-full absolute right-0.5 top-0.5 shadow-sm transform transition-transform"></div>
+                <div 
+                  className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-300 shadow-inner flex items-center ${
+                    triggerSass ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <div 
+                    className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                      triggerSass ? 'translate-x-5.5' : 'translate-x-0'
+                    }`}
+                  ></div>
                 </div>
-              </div>
+              </button>
+
+              {/* Trigger 2: Rappel Événement (J-1) */}
+              <button
+                type="button"
+                onClick={toggleTriggerEvent}
+                className="w-full flex items-center justify-between p-3.5 bg-background border border-border/50 rounded-xl hover:bg-secondary/40 transition-all cursor-pointer group text-left outline-none"
+              >
+                <div>
+                  <span className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors block">
+                    Rappel Événement (J-1)
+                  </span>
+                  <span className={`text-[11px] font-medium transition-colors ${triggerEvent ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-muted-foreground'}`}>
+                    {triggerEvent ? '● Actif (Envoi auto la veille)' : '○ Désactivé'}
+                  </span>
+                </div>
+                <div 
+                  className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-300 shadow-inner flex items-center ${
+                    triggerEvent ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                  }`}
+                >
+                  <div 
+                    className={`w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                      triggerEvent ? 'translate-x-5.5' : 'translate-x-0'
+                    }`}
+                  ></div>
+                </div>
+              </button>
+
             </div>
           </div>
         </div>

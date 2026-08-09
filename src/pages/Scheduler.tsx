@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Calendar as CalendarIcon, Clock, MapPin, Plus, Loader2, X, ExternalLink, Edit2, Trash2 } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Calendar as CalendarIcon, Clock, Plus, Loader2, X, Edit2, Trash2, Video, Users, Link2, Sparkles, Settings, UserCheck, Radio, CheckCircle } from 'lucide-react';
 import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -19,34 +19,143 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
+const SECTORS = [
+  "Vaisselle", "Café", "Restauration", "Organisation", "Sonorisation",
+  "Visuelle", "Bétail", "Cuisine", "Eau & Hygiène", "Protocole",
+  "Decoration", "Culturelle", "Conservatoire", "Campagne", "Jayanté Kat yi",
+  "Nouveau"
+];
+
 type EventData = {
   id: string;
   title: string;
   event_type: string;
   event_date: string;
-  location: string;
-  description: string;
-  maps_link: string;
+  location: string | null;
+  description: string | null;
+  maps_link: string | null;
+  meet_url?: string | null;
+  is_online?: boolean;
+  target_audience?: string;
+  target_sector?: string | null;
+  target_member_id?: string | null;
 };
 
+type FormattedEvent = {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  resource: EventData;
+};
+
+type MemberItem = {
+  id: string;
+  first_name: string;
+  last_name: string;
+  sector: string;
+};
+
+interface MeetingParticipant {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  full_name?: string;
+  email: string;
+  role: string;
+  avatar_url?: string;
+  photo_url?: string;
+}
+
 const Scheduler = () => {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [membersList, setMembersList] = useState<MemberItem[]>([]);
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
+  // Modal Gestion Réunion
+  const [managedMeeting, setManagedMeeting] = useState<EventData | null>(null);
+  const [manageTab, setManageTab] = useState<'membres' | 'presences' | 'suivi'>('presences');
+  const [bureauMembers, setBureauMembers] = useState<MeetingParticipant[]>([]);
+  const [confirmedAttendees, setConfirmedAttendees] = useState<MeetingParticipant[]>([]);
+  const [liveViewers, setLiveViewers] = useState<MeetingParticipant[]>([]);
+  const [loadingManage, setLoadingManage] = useState(false);
+
+  const openManageMeeting = async (meeting: EventData) => {
+    setManagedMeeting(meeting);
+    setManageTab('presences');
+    setLoadingManage(true);
+    setBureauMembers([]);
+    setConfirmedAttendees([]);
+    setLiveViewers([]);
+
+    try {
+      const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière'];
+
+      // 1. Membres du Bureau
+      const { data: bm } = await supabase
+        .from('members')
+        .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+        .in('role', bureauRoles)
+        .order('first_name');
+      if (bm) setBureauMembers(bm as MeetingParticipant[]);
+
+      // 2. Présences confirmées
+      const { data: att } = await supabase
+        .from('attendances')
+        .select('member_email')
+        .eq('meeting_id', meeting.id.toString());
+
+      if (att && att.length > 0) {
+        const emails = att.map((a: { member_email: string }) => a.member_email);
+        const { data: attendeeProfiles } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+          .in('email', emails);
+        if (attendeeProfiles) setConfirmedAttendees(attendeeProfiles as MeetingParticipant[]);
+      }
+
+      // 3. Suivi en direct (meeting_viewers)
+      const { data: viewers } = await supabase
+        .from('meeting_viewers')
+        .select('member_email, joined_at')
+        .eq('meeting_id', meeting.id.toString())
+        .order('joined_at', { ascending: false });
+
+      if (viewers && viewers.length > 0) {
+        const vEmails = viewers.map((v: { member_email: string }) => v.member_email);
+        const { data: viewerProfiles } = await supabase
+          .from('members')
+          .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+          .in('email', vEmails);
+        if (viewerProfiles) setLiveViewers(viewerProfiles as MeetingParticipant[]);
+      }
+    } catch (err) {
+      console.warn("Erreur chargement gestion:", err);
+    } finally {
+      setLoadingManage(false);
+    }
+  };
+  
   const [formData, setFormData] = useState({
     title: '',
     event_type: 'Dahira',
     event_date: '',
     location: '',
     description: '',
-    maps_link: ''
+    maps_link: '',
+    meet_url: '',
+    is_online: false,
+    target_audience: 'Tous les membres',
+    target_sector: '',
+    target_member_id: ''
   });
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -56,8 +165,7 @@ const Scheduler = () => {
 
       if (error) throw error;
 
-      // Format for react-big-calendar
-      const formattedEvents = (data || []).map((evt: EventData) => {
+      const formattedEvents: FormattedEvent[] = (data || []).map((evt: EventData) => {
         const startDate = new Date(evt.event_date);
         
         if (!isValid(startDate)) return null;
@@ -70,28 +178,58 @@ const Scheduler = () => {
           end: endDate,
           resource: evt
         };
-      }).filter(Boolean);
+      }).filter((evt): evt is FormattedEvent => evt !== null);
 
       setEvents(formattedEvents);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erreur lors du chargement des événements", err);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchEvents();
   }, []);
 
+  const fetchMembers = useCallback(async () => {
+    try {
+      const { data } = await supabase.from('members').select('id, first_name, last_name, sector').order('first_name');
+      if (data) setMembersList(data as MemberItem[]);
+    } catch (err: unknown) {
+      console.error("Erreur chargement membres:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    const init = async () => {
+      if (isMounted) {
+        await fetchEvents();
+        await fetchMembers();
+      }
+    };
+    init();
+    return () => { isMounted = false; };
+  }, [fetchEvents, fetchMembers]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const target = e.target;
+    const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
+    setFormData({ ...formData, [target.name]: value });
+  };
+
+  const generateGoogleMeetRoom = () => {
+    const randomRoomId = Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6);
+    const generatedUrl = `https://meet.jit.si/DMK-${randomRoomId}`;
+    setFormData((prev) => ({
+      ...prev,
+      meet_url: generatedUrl,
+      is_online: true,
+      location: prev.location || 'Visioconférence Google Meet (En Ligne)'
+    }));
   };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.event_date) {
-      alert("Veuillez remplir les champs obligatoires.");
+      alert("Veuillez remplir les champs obligatoires (*).");
       return;
     }
     
@@ -100,50 +238,109 @@ const Scheduler = () => {
     try {
       const eventDate = new Date(formData.event_date).toISOString();
       
-      const eventPayload = {
+      const eventPayload: Partial<EventData> = {
         title: formData.title,
         event_type: formData.event_type,
         event_date: eventDate,
         location: formData.location || null,
         description: formData.description || null,
-        maps_link: formData.maps_link || null
+        maps_link: formData.maps_link || null,
+        meet_url: formData.meet_url || null,
+        is_online: formData.is_online || Boolean(formData.meet_url),
+        target_audience: formData.target_audience,
+        target_sector: formData.target_audience === 'Secteur Spécifique' ? formData.target_sector : null,
+        target_member_id: formData.target_audience === 'Membre Spécifique' ? formData.target_member_id : null
       };
 
       if (editingEventId) {
         const { error } = await supabase.from('events').update(eventPayload).eq('id', editingEventId);
-        if (error) throw error;
+        if (error) {
+          const fallbackPayload = {
+            title: formData.title,
+            event_type: formData.event_type,
+            event_date: eventDate,
+            location: formData.location || null,
+            description: formData.description || null,
+            maps_link: formData.maps_link || null
+          };
+          const { error: err2 } = await supabase.from('events').update(fallbackPayload).eq('id', editingEventId);
+          if (err2) throw err2;
+        }
         await logActivity('MODIFICATION', 'ÉVÉNEMENT', `Modification de l'événement: ${formData.title}`);
       } else {
         const { error } = await supabase.from('events').insert([eventPayload]);
-        if (error) throw error;
+        if (error) {
+          const fallbackPayload = {
+            title: formData.title,
+            event_type: formData.event_type,
+            event_date: eventDate,
+            location: formData.location || null,
+            description: formData.description || null,
+            maps_link: formData.maps_link || null
+          };
+          const { error: err2 } = await supabase.from('events').insert([fallbackPayload]);
+          if (err2) throw err2;
+        }
         await logActivity('CRÉATION', 'ÉVÉNEMENT', `Création d'un nouvel événement: ${formData.title}`);
+
+        try {
+          const visioInfo = formData.meet_url ? ` 🎥 Lien Visio: ${formData.meet_url}` : '';
+          await supabase.from('communications').insert([{
+            title: `📅 Nouvelle Réunion/Événement: ${formData.title}`,
+            content: `Vous êtes invité(e) à la réunion "${formData.title}" prévue le ${format(new Date(eventDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })}.${visioInfo}`,
+            type: 'Push Application',
+            target_audience: formData.target_audience
+          }]);
+        } catch (notifErr) {
+          console.warn("Notification non envoyée mais événement créé", notifErr);
+        }
       }
 
       setIsModalOpen(false);
       setEditingEventId(null);
-      setFormData({
-        title: '', event_type: 'Dahira', event_date: '', location: '', description: '', maps_link: ''
-      });
+      resetForm();
       fetchEvents();
       
-    } catch (err: any) {
-      console.error("Erreur de sauvegarde:", err.message);
-      alert("Une erreur est survenue lors de l'enregistrement de l'événement.");
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '';
+      console.error("Erreur de sauvegarde:", errMsg);
+      alert("Une erreur est survenue lors de l'enregistrement de l'événement: " + errMsg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleEditClick = (evt: any) => {
+  const resetForm = () => {
+    setFormData({
+      title: '',
+      event_type: 'Dahira',
+      event_date: '',
+      location: '',
+      description: '',
+      maps_link: '',
+      meet_url: '',
+      is_online: false,
+      target_audience: 'Tous les membres',
+      target_sector: '',
+      target_member_id: ''
+    });
+  };
+
+  const handleEditClick = (evt: FormattedEvent) => {
+    const res = evt.resource;
     setEditingEventId(evt.id);
     setFormData({
       title: evt.title,
-      event_type: evt.resource.event_type,
-      // Format the date for the datetime-local input (YYYY-MM-DDThh:mm)
-      event_date: new Date(evt.resource.event_date).toISOString().slice(0, 16),
-      location: evt.resource.location || '',
-      description: evt.resource.description || '',
-      maps_link: evt.resource.maps_link || ''
+      event_type: res.event_type,
+      event_date: new Date(res.event_date).toISOString().slice(0, 16),
+      location: res.location || '',
+      description: res.description || '',
+      maps_link: res.maps_link || '',
+      meet_url: res.meet_url || '',
+      is_online: res.is_online || false,
+      target_audience: res.target_audience || 'Tous les membres',
+      target_sector: res.target_sector || '',
+      target_member_id: res.target_member_id || ''
     });
     setIsModalOpen(true);
   };
@@ -155,111 +352,197 @@ const Scheduler = () => {
       if (error) throw error;
       await logActivity('SUPPRESSION', 'ÉVÉNEMENT', `Suppression de l'événement: ${title}`);
       fetchEvents();
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error("Erreur suppression:", err);
       alert("Erreur lors de la suppression de l'événement.");
     }
   };
 
-  // Custom styling for events
-  const eventStyleGetter = (event: any) => {
-    let backgroundColor = '#3b82f6'; // blue default
-    if (event.resource.event_type === 'Bureau') backgroundColor = '#9333ea'; // purple
-    if (event.resource.event_type === 'AG') backgroundColor = '#ef4444'; // red
+  const eventStyleGetter = (event: FormattedEvent) => {
+    let backgroundColor = '#3b82f6';
+    if (event.resource.event_type === 'Bureau') backgroundColor = '#9333ea';
+    if (event.resource.event_type === 'AG') backgroundColor = '#ef4444';
+    if (event.resource.is_online || event.resource.meet_url) backgroundColor = '#059669';
     
     return {
       style: {
         backgroundColor,
-        borderRadius: '5px',
-        opacity: 0.8,
+        borderRadius: '8px',
+        opacity: 0.9,
         color: 'white',
         border: '0px',
-        display: 'block'
+        display: 'block',
+        fontSize: '12px',
+        fontWeight: 'bold',
+        padding: '2px 6px'
       }
     };
   };
 
   return (
     <div className="space-y-6 relative">
+      
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-card p-6 rounded-2xl border border-border/50 shadow-sm relative overflow-hidden gap-4">
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Planificateur</h1>
-          <p className="text-muted-foreground mt-1 font-medium">Calendrier interactif des réunions et Dahiras</p>
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight">Planificateur &amp; Visioconférences</h1>
+          <p className="text-muted-foreground mt-1 font-medium">Gestion des réunions Bureau, Dahiras et Visioconférences ciblées</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => { resetForm(); setIsModalOpen(true); }}
           className="relative z-10 bg-gradient-to-r from-primary to-indigo-600 text-primary-foreground px-5 py-2.5 rounded-xl flex items-center font-semibold shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 transition-all duration-300 w-full md:w-auto justify-center"
         >
           <Plus size={20} className="mr-2" />
-          Nouvel Événement
+          Nouvelle Réunion / Événement
         </button>
       </div>
 
       {/* --- Add/Edit Event Modal --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-md p-4">
-          <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/50 overflow-hidden max-h-[90vh] flex flex-col relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-indigo-600"></div>
+          <div className="bg-card w-full max-w-xl rounded-2xl shadow-2xl border border-border/50 overflow-hidden max-h-[92vh] flex flex-col relative animate-in zoom-in-95 duration-200">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-indigo-600"></div>
+            
             <div className="flex items-center justify-between p-5 border-b border-border/50 bg-muted/10 shrink-0">
-              <h2 className="text-xl font-bold text-foreground">
-                {editingEventId ? "Modifier l'Événement" : "Nouvel Événement"}
+              <h2 className="text-xl font-bold text-foreground flex items-center">
+                <Video size={20} className="mr-2 text-primary" />
+                {editingEventId ? "Modifier l'Événement" : "Programmer une Réunion / Événement"}
               </h2>
-              <button type="button" onClick={() => {
-                setIsModalOpen(false);
-                setEditingEventId(null);
-                setFormData({ title: '', event_type: 'Dahira', event_date: '', location: '', description: '', maps_link: '' });
-              }} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
+              <button 
+                type="button" 
+                onClick={() => { setIsModalOpen(false); setEditingEventId(null); resetForm(); }}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors"
+              >
                 <X size={20} />
               </button>
             </div>
             
             <form onSubmit={handleSaveEvent} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+              
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Titre de l'événement *</label>
-                <input required name="title" value={formData.title} onChange={handleInputChange} type="text" placeholder="Ex: Grande Dahira de Juin" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Titre de la Réunion / Événement *</label>
+                <input required name="title" value={formData.title} onChange={handleInputChange} type="text" placeholder="Ex: Réunion Bureau Mensuelle" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Type *</label>
-                  <select name="event_type" value={formData.event_type} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none">
-                    <option>Dahira</option>
-                    <option>Bureau</option>
-                    <option>AG</option>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Type *</label>
+                  <select name="event_type" value={formData.event_type} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none">
+                    <option value="Bureau">Réunion Bureau</option>
+                    <option value="Dahira">Dahira Mensuel</option>
+                    <option value="AG">Assemblée Générale</option>
+                    <option value="Magal">Magal / Gamou</option>
+                    <option value="Autre">Autre Événement</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">Date et Heure *</label>
-                  <input required name="event_date" value={formData.event_date} onChange={handleInputChange} type="datetime-local" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date et Heure *</label>
+                  <input required name="event_date" value={formData.event_date} onChange={handleInputChange} type="datetime-local" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
+                </div>
+              </div>
+
+              {/* SECTION AUDIENCE CIBLE & INVITÉS */}
+              <div className="p-4 bg-muted/20 rounded-xl border border-border/50 space-y-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-foreground flex items-center">
+                  <Users size={16} className="mr-2 text-primary" />
+                  Membres invités (Audience Cible)
+                </label>
+                <select name="target_audience" value={formData.target_audience} onChange={handleInputChange} className="w-full bg-background border border-border/50 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none">
+                  <option value="Tous les membres">Tous les membres (AG, Dahira)</option>
+                  <option value="Bureau Uniquement">Membres du Bureau uniquement</option>
+                  <option value="Secteur Spécifique">Secteur spécifique</option>
+                  <option value="Membre Spécifique">Membre spécifique</option>
+                </select>
+
+                {formData.target_audience === 'Secteur Spécifique' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Choisir le Secteur</label>
+                    <select name="target_sector" value={formData.target_sector} onChange={handleInputChange} className="w-full bg-background border border-border/50 rounded-xl px-3.5 py-2 text-sm font-semibold text-foreground outline-none">
+                      <option value="">-- Choisir un secteur --</option>
+                      {SECTORS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {formData.target_audience === 'Membre Spécifique' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-muted-foreground mb-1">Choisir le Membre</label>
+                    <select name="target_member_id" value={formData.target_member_id} onChange={handleInputChange} className="w-full bg-background border border-border/50 rounded-xl px-3.5 py-2 text-sm font-semibold text-foreground outline-none">
+                      <option value="">-- Choisir un membre --</option>
+                      {membersList.map(m => <option key={m.id} value={m.id}>{m.first_name} {m.last_name} ({m.sector})</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION VISIOCONFÉRENCE GOOGLE MEET */}
+              <div className="p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center">
+                    <Video size={16} className="mr-2 text-emerald-600" />
+                    Format Visioconférence (Google Meet)
+                  </label>
+                  <button 
+                    type="button" 
+                    onClick={generateGoogleMeetRoom}
+                    className="inline-flex items-center text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg shadow transition-all active:scale-95"
+                  >
+                    <Sparkles size={13} className="mr-1.5" />
+                    Générer la Visio
+                  </button>
+                </div>
+
+                <div>
+                  <input 
+                    name="meet_url" 
+                    value={formData.meet_url} 
+                    onChange={handleInputChange} 
+                    type="url" 
+                    placeholder="https://meet.google.com/abc-defg-hij ou salon visio" 
+                    className="w-full bg-background border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-foreground focus:ring-2 focus:ring-emerald-500 outline-none" 
+                  />
+                  {formData.meet_url && (
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center">
+                      <Link2 size={12} className="mr-1" />
+                      Lien visioconférence actif ! Accessible directement depuis l'application membre.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Lieu physique (si présentiel)</label>
+                  <input name="location" value={formData.location} onChange={handleInputChange} type="text" placeholder="Ex: Siège DMK / Touba" className="w-full bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Google Maps (Optionnel)</label>
+                  <input name="maps_link" value={formData.maps_link} onChange={handleInputChange} type="url" placeholder="https://maps.app.goo.gl/..." className="w-full bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Lieu</label>
-                <input name="location" value={formData.location} onChange={handleInputChange} type="text" placeholder="Lieu de la rencontre" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Lien Google Maps (Optionnel)</label>
-                <input name="maps_link" value={formData.maps_link} onChange={handleInputChange} type="url" placeholder="https://maps.app.goo.gl/..." className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Ordre du jour / Description</label>
+                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} placeholder="Saisir les points à l'ordre du jour..." className="w-full bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm font-semibold text-foreground focus:ring-2 focus:ring-primary outline-none resize-none"></textarea>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none resize-none"></textarea>
-              </div>
-
-              <div className="pt-6 border-t border-border/50 mt-6 flex justify-end space-x-3 shrink-0">
-                <button type="button" onClick={() => {
-                  setIsModalOpen(false);
-                  setEditingEventId(null);
-                  setFormData({ title: '', event_type: 'Dahira', event_date: '', location: '', description: '', maps_link: '' });
-                }} className="px-5 py-2.5 font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors">
+              {/* Submit / Cancel Buttons */}
+              <div className="pt-4 border-t border-border/50 flex justify-end space-x-3 shrink-0">
+                <button 
+                  type="button" 
+                  onClick={() => { setIsModalOpen(false); setEditingEventId(null); resetForm(); }}
+                  className="px-5 py-2.5 font-bold text-xs text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors"
+                >
                   Annuler
                 </button>
-                <button type="submit" disabled={isSubmitting} className="bg-gradient-to-r from-primary to-indigo-600 text-primary-foreground font-semibold px-5 py-2.5 rounded-xl flex items-center shadow-md hover:shadow-lg transition-all disabled:opacity-50">
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin mr-2" /> : null}
-                  Enregistrer
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting} 
+                  className="bg-gradient-to-r from-primary to-indigo-600 text-primary-foreground font-extrabold text-xs px-6 py-2.5 rounded-xl flex items-center shadow-md hover:shadow-lg transition-all disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
+                  Enregistrer &amp; Programmer
                 </button>
               </div>
             </form>
@@ -267,94 +550,278 @@ const Scheduler = () => {
         </div>
       )}
 
+      {/* Big Calendar & List Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div className="lg:col-span-2 bg-card border border-border/50 rounded-2xl shadow-sm min-h-[500px] p-6 relative overflow-hidden">
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
-          <div className="h-[500px] bg-background rounded-xl p-3 border border-border/50 relative z-10 shadow-inner">
-             {/* Note: react-big-calendar CSS needs adjustments for full dark mode support, using a wrapper here */}
-            <Calendar
-              localizer={localizer}
-              events={events}
-              startAccessor="start"
-              endAccessor="end"
-              style={{ height: '100%' }}
-              culture="fr"
-              eventPropGetter={eventStyleGetter}
-              messages={{
-                next: "Suivant",
-                previous: "Précédent",
-                today: "Aujourd'hui",
-                month: "Mois",
-                week: "Semaine",
-                day: "Jour",
-                agenda: "Agenda",
-              }}
-            />
-          </div>
+        <div className="lg:col-span-2 bg-card border border-border/50 rounded-2xl shadow-sm p-6">
+          {loading ? (
+            <div className="flex h-96 items-center justify-center">
+              <Loader2 className="animate-spin text-primary" size={32} />
+            </div>
+          ) : (
+            <div className="h-[550px]">
+              <Calendar
+                localizer={localizer}
+                events={events}
+                startAccessor="start"
+                endAccessor="end"
+                style={{ height: '100%' }}
+                eventPropGetter={eventStyleGetter}
+                messages={{
+                  next: "Suivant",
+                  previous: "Précédent",
+                  today: "Aujourd'hui",
+                  month: "Mois",
+                  week: "Semaine",
+                  day: "Jour",
+                  agenda: "Agenda"
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="space-y-4 bg-card border border-border/50 rounded-2xl p-6 shadow-sm relative overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
-          <h2 className="text-xl font-bold text-foreground flex items-center relative z-10 mb-6">
-            {loading && <Loader2 size={18} className="animate-spin mr-3 text-primary" />}
-            Prochains Événements
+        {/* Right Sidebar List */}
+        <div className="bg-card border border-border/50 rounded-2xl shadow-sm p-6 space-y-4">
+          <h2 className="text-lg font-bold text-foreground flex items-center">
+            <CalendarIcon className="mr-2 text-primary" size={20} />
+            Prochaines Réunions &amp; Visios
           </h2>
-          
-          <div className="max-h-[500px] overflow-y-auto pr-2 space-y-4 relative z-10 custom-scrollbar">
-            {events.length === 0 && !loading && (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-center bg-secondary/20 rounded-xl border border-dashed border-border">
-                <CalendarIcon className="w-12 h-12 mb-3 opacity-30" />
-                <p className="text-sm font-medium">Aucun événement prévu.</p>
-              </div>
-            )}
-            
-            {events.map((evt) => (
-              <div key={evt.id} className="group relative bg-background/50 border border-border/50 p-5 rounded-xl hover:bg-secondary/50 hover:border-primary/30 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5">
-                <div className="flex justify-between items-start mb-3">
-                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
-                    evt.resource.event_type === 'Bureau' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' :
-                    evt.resource.event_type === 'AG' ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' :
-                    'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                  }`}>
-                    {evt.resource.event_type}
-                  </span>
-                  <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => handleEditClick(evt)} className="text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-colors p-1.5 rounded-md">
-                      <Edit2 size={16} />
-                    </button>
-                    <button onClick={() => handleDeleteEvent(evt.id, evt.title)} className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors p-1.5 rounded-md">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                <h3 className="font-extrabold text-foreground mb-3 text-lg line-clamp-2 group-hover:text-primary transition-colors">{evt.title}</h3>
-                <div className="space-y-2.5 text-sm font-medium text-muted-foreground">
-                  <div className="flex items-center">
-                    <CalendarIcon size={16} className="mr-2.5 shrink-0 opacity-70" />
-                    {isValid(evt.start) ? format(evt.start, "dd MMMM yyyy", { locale: fr }) : "Date invalide"}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock size={16} className="mr-2.5 shrink-0 opacity-70" />
-                    {isValid(evt.start) ? format(evt.start, "HH:mm") : "--:--"}
-                  </div>
-                  {evt.resource.location && (
-                    <div className="flex items-center">
-                      <MapPin size={16} className="mr-2.5 min-w-[16px] opacity-70" />
-                      <span className="truncate">{evt.resource.location}</span>
+
+          <div className="space-y-3 overflow-y-auto max-h-[500px] pr-1 custom-scrollbar">
+            {events.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Aucune réunion programmée.</p>
+            ) : (
+              events.map((evt) => {
+                const res = evt.resource;
+                const isOnline = res.is_online || Boolean(res.meet_url);
+                return (
+                  <div key={evt.id} className="p-4 bg-secondary/30 rounded-xl border border-border/50 space-y-2 hover:bg-secondary/60 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                        isOnline ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-primary/10 text-primary'
+                      }`}>
+                        {isOnline ? 'Visioconférence' : res.event_type}
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <button 
+                          onClick={() => openManageMeeting(res)} 
+                          className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                          title="Gérer les présences et le suivi en direct"
+                        >
+                          <Settings size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleEditClick(evt)} 
+                          className="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          title="Modifier"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteEvent(evt.id, evt.title)} 
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  {evt.resource.maps_link && (
-                    <a href={evt.resource.maps_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-xs font-semibold text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 mt-3 bg-blue-500/10 hover:bg-blue-500/20 px-3 py-1.5 rounded-lg transition-colors w-fit">
-                      <ExternalLink size={14} className="mr-1.5" />
-                      Ouvrir la carte
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+
+                    <h3 className="font-bold text-sm text-foreground line-clamp-1">{evt.title}</h3>
+                    
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      <Clock size={12} className="mr-1.5 text-primary" />
+                      {format(new Date(res.event_date), "dd MMM yyyy 'à' HH:mm", { locale: fr })}
+                    </div>
+
+                    {isOnline && res.meet_url && (
+                      <a 
+                        href={res.meet_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline pt-1"
+                      >
+                        <Video size={13} className="mr-1" />
+                        Rejoindre la visio
+                      </a>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
+
+      {/* --- Management Modal (Présences, Bureau, En Direct) --- */}
+      {managedMeeting && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-background/80 backdrop-blur-md p-4">
+          <div className="bg-card w-full max-w-lg rounded-2xl shadow-2xl border border-border/50 overflow-hidden max-h-[92vh] flex flex-col relative animate-in zoom-in-95 duration-200">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+            
+            {/* Header */}
+            <div className="flex items-start justify-between p-5 border-b border-border/50 bg-muted/10 shrink-0">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Gestion Réunion &amp; Suivi</span>
+                </div>
+                <h3 className="text-lg font-bold text-foreground truncate">{managedMeeting.title}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {format(new Date(managedMeeting.event_date), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                </p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setManagedMeeting(null)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 px-5 pt-4 shrink-0">
+              {([
+                { key: 'presences', label: 'Présences', icon: <UserCheck size={14} />, count: confirmedAttendees.length },
+                { key: 'membres', label: 'Bureau', icon: <Users size={14} />, count: bureauMembers.length },
+                { key: 'suivi', label: 'En Direct', icon: <Radio size={14} />, count: liveViewers.length },
+              ] as { key: 'presences' | 'membres' | 'suivi'; label: string; icon: React.ReactNode; count: number }[]).map(tab => (
+                <button
+                  key={tab.key}
+                  onClick={() => setManageTab(tab.key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all ${
+                    manageTab === tab.key
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted/40 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  <span className="ml-0.5 text-[10px] bg-background/30 rounded-full px-1.5 py-0.2 font-extrabold">{tab.count}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-2 custom-scrollbar">
+              {loadingManage ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={24} className="animate-spin text-primary" />
+                </div>
+              ) : (
+                <>
+                  {/* TAB PRÉSENCES */}
+                  {manageTab === 'presences' && (
+                    confirmedAttendees.length === 0 ? (
+                      <div className="py-8 text-center text-muted-foreground text-sm font-medium">
+                        Aucune présence confirmée pour le moment.
+                      </div>
+                    ) : (
+                      confirmedAttendees.map(m => (
+                        <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-xs flex items-center justify-center overflow-hidden">
+                              {m.avatar_url || m.photo_url ? (
+                                <img src={m.avatar_url || m.photo_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                (m.first_name || m.full_name || '?').charAt(0)
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-bold text-xs text-foreground">{m.full_name || `${m.first_name} ${m.last_name}`}</p>
+                              <p className="text-[10px] text-muted-foreground">{m.role || 'Membre'}</p>
+                            </div>
+                          </div>
+                          <CheckCircle size={16} className="text-emerald-500" />
+                        </div>
+                      ))
+                    )
+                  )}
+
+                  {/* TAB BUREAU */}
+                  {manageTab === 'membres' && (
+                    bureauMembers.length === 0 ? (
+                      <div className="py-8 text-center text-muted-foreground text-sm font-medium">
+                        Aucun membre du bureau trouvé.
+                      </div>
+                    ) : (
+                      bureauMembers.map(m => {
+                        const hasConfirmed = confirmedAttendees.some(a => a.email === m.email);
+                        return (
+                          <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center overflow-hidden">
+                                {m.avatar_url || m.photo_url ? (
+                                  <img src={m.avatar_url || m.photo_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  (m.first_name || m.full_name || '?').charAt(0)
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-bold text-xs text-foreground">{m.full_name || `${m.first_name} ${m.last_name}`}</p>
+                                <p className="text-[10px] text-muted-foreground">{m.role}</p>
+                              </div>
+                            </div>
+                            {hasConfirmed ? (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">✓ Confirmé</span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-full">En attente</span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )
+                  )}
+
+                  {/* TAB EN DIRECT */}
+                  {manageTab === 'suivi' && (
+                    liveViewers.length === 0 ? (
+                      <div className="py-8 text-center text-muted-foreground text-sm font-medium">
+                        Aucun membre n'est actuellement en train de regarder la visio en direct.
+                      </div>
+                    ) : (
+                      liveViewers.map(m => (
+                        <div key={m.id} className="flex items-center justify-between p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="relative w-8 h-8 rounded-full bg-purple-500/20 text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-center overflow-hidden">
+                              {m.avatar_url || m.photo_url ? (
+                                <img src={m.avatar_url || m.photo_url} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                (m.first_name || m.full_name || '?').charAt(0)
+                              )}
+                              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-red-500 border border-background animate-pulse"></span>
+                            </div>
+                            <div>
+                              <p className="font-bold text-xs text-foreground">{m.full_name || `${m.first_name} ${m.last_name}`}</p>
+                              <p className="text-[10px] text-muted-foreground">{m.role || 'Membre'}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-black text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                            Live
+                          </span>
+                        </div>
+                      ))
+                    )
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-border/50 bg-muted/10 shrink-0">
+              <button
+                type="button"
+                onClick={() => setManagedMeeting(null)}
+                className="w-full bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs py-2.5 rounded-xl transition-colors"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

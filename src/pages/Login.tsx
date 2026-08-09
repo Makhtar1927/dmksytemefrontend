@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Loader2, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Loader2, Lock, Mail, ArrowRight, UserPlus } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -19,21 +19,39 @@ const Login = () => {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        throw error;
+      if (authError) {
+        throw authError;
       }
 
-      // Redirect to the page they tried to visit, or dashboard
+      // Check member status in database
+      if (authData.user?.email) {
+        const { data: member } = await supabase
+          .from('members')
+          .select('status')
+          .ilike('email', authData.user.email.trim())
+          .maybeSingle();
+
+        if (member && (member.status === 'En attente' || member.status === 'Inactif')) {
+          await supabase.auth.signOut();
+          setError(member.status === 'En attente'
+            ? 'Votre compte est en attente d\'activation par l\'administrateur. Veuillez patienter.'
+            : 'Votre compte a été désactivé par l\'administrateur.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Redirect to dashboard or previous URL
       navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message === 'Invalid login credentials' 
         ? 'Email ou mot de passe incorrect.' 
-        : 'Une erreur est survenue lors de la connexion.');
+        : (err.message || 'Une erreur est survenue lors de la connexion.'));
     } finally {
       setLoading(false);
     }
@@ -50,7 +68,7 @@ const Login = () => {
       <div className="relative z-10 w-full max-w-[420px] max-h-[95vh] overflow-y-auto custom-scrollbar p-10 bg-card/70 dark:bg-card/40 border border-white/20 dark:border-white/10 rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
         
         {/* Logo & Header */}
-        <div className="text-center mb-10">
+        <div className="text-center mb-8">
           <div className="w-24 h-24 mx-auto mb-6 relative group">
             <div className="absolute inset-0 bg-gradient-to-br from-primary to-blue-600 rounded-[1.5rem] blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
             <img 
@@ -58,7 +76,6 @@ const Login = () => {
               alt="DMK Logo" 
               className="w-full h-full object-cover rounded-[1.5rem] relative z-10 shadow-lg ring-1 ring-white/20 dark:ring-white/10 bg-white"
               onError={(e) => {
-                // Fallback si l'image ne charge pas
                 (e.target as HTMLImageElement).src = 'https://placehold.co/200x200/2563eb/white?text=DMK';
               }}
             />
@@ -69,8 +86,8 @@ const Login = () => {
 
         {error && (
           <div className="bg-red-500/10 text-red-600 dark:text-red-400 p-4 rounded-xl text-sm mb-6 border border-red-500/20 font-medium flex items-center">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2.5"></div>
-            {error}
+            <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2.5 shrink-0"></div>
+            <span>{error}</span>
           </div>
         )}
 
@@ -128,7 +145,21 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="mt-10 text-center">
+        {/* Option S'inscrire */}
+        <div className="mt-6 pt-6 border-t border-border/40 text-center">
+          <p className="text-sm font-semibold text-muted-foreground">
+            Pas encore de compte ?{' '}
+            <Link 
+              to="/register" 
+              className="inline-flex items-center font-extrabold text-primary hover:underline transition-all ml-1"
+            >
+              <UserPlus size={16} className="mr-1" />
+              S'inscrire
+            </Link>
+          </p>
+        </div>
+
+        <div className="mt-8 text-center">
           <p className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-wider">
             &copy; {new Date().getFullYear()} DMK • Accès Restreint
           </p>
