@@ -216,14 +216,30 @@ const Scheduler = () => {
     setFormData({ ...formData, [target.name]: value });
   };
 
-  const generateGoogleMeetRoom = () => {
-    const randomRoomId = Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6);
-    const generatedUrl = `https://meet.jit.si/DMK-${randomRoomId}`;
+  const generateVisioRoom = async () => {
+    const randomRoomId = Math.random().toString(36).substring(2, 6) + '-' + Math.random().toString(36).substring(2, 6);
+    let generatedUrl = `https://dmk-dahira.daily.co/dmk-reunion-${randomRoomId}`;
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await fetch(`${API_URL}/api/daily/create-room`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName: `dmk-reunion-${randomRoomId}` })
+      });
+      const data = await res.json();
+      if (data?.url) {
+        generatedUrl = data.url;
+      }
+    } catch (err) {
+      console.warn("API Daily backend non joignable, fallback local utilisé:", err);
+    }
+
     setFormData((prev) => ({
       ...prev,
       meet_url: generatedUrl,
       is_online: true,
-      location: prev.location || 'Visioconférence Google Meet (En Ligne)'
+      location: prev.location || 'Visioconférence DMK (Daily.co)'
     }));
   };
 
@@ -477,17 +493,17 @@ const Scheduler = () => {
                 )}
               </div>
 
-              {/* SECTION VISIOCONFÉRENCE GOOGLE MEET */}
-              <div className="p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/20 space-y-3">
+              {/* SECTION VISIOCONFÉRENCE DAILY.CO */}
+              <div className="p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 flex items-center">
-                    <Video size={16} className="mr-2 text-emerald-600" />
-                    Format Visioconférence (Google Meet)
+                  <label className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 flex items-center">
+                    <Video size={16} className="mr-2 text-indigo-600" />
+                    Visioconférence Direct App (Daily.co - Illimité)
                   </label>
                   <button 
                     type="button" 
-                    onClick={generateGoogleMeetRoom}
-                    className="inline-flex items-center text-xs font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg shadow transition-all active:scale-95"
+                    onClick={generateVisioRoom}
+                    className="inline-flex items-center text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow transition-all active:scale-95"
                   >
                     <Sparkles size={13} className="mr-1.5" />
                     Générer la Visio
@@ -500,13 +516,13 @@ const Scheduler = () => {
                     value={formData.meet_url} 
                     onChange={handleInputChange} 
                     type="url" 
-                    placeholder="https://meet.google.com/abc-defg-hij ou salon visio" 
-                    className="w-full bg-background border border-emerald-500/30 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-foreground focus:ring-2 focus:ring-emerald-500 outline-none" 
+                    placeholder="https://dmk-dahira.daily.co/reunion-bureau ou salon visio" 
+                    className="w-full bg-background border border-indigo-500/30 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-foreground focus:ring-2 focus:ring-indigo-500 outline-none" 
                   />
                   {formData.meet_url && (
-                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center">
+                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-semibold mt-1 flex items-center">
                       <Link2 size={12} className="mr-1" />
-                      Lien visioconférence actif ! Accessible directement depuis l'application membre.
+                      Lien visioconférence actif ! Accessible directement en vidéo dans l'application membre.
                     </p>
                   )}
                 </div>
