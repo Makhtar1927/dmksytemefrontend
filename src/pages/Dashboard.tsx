@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Users, Wallet, TrendingUp, Loader2, Calendar, ExternalLink, MapPin, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -38,85 +38,97 @@ const Dashboard = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch Total Members
+      const { count: totalCount } = await supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true });
         
-        // Fetch Total Members
-        const { count: totalCount } = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true });
-          
-        // Fetch Active Members
-        const { count: activeCount } = await supabase
-          .from('members')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'Actif');
+      // Fetch Active Members
+      const { count: activeCount } = await supabase
+        .from('members')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'Actif');
 
-        // Fetch Total Funds and Chart Data via SQL View
-        const { data: summaryData } = await supabase
-          .from('monthly_contributions_summary')
-          .select('month_start, total_amount')
-          .order('month_start', { ascending: true });
-          
-        let totalFunds = 0;
-        const formattedChartData: any[] = [];
+      // Fetch Total Funds and Chart Data via SQL View
+      const { data: summaryData } = await supabase
+        .from('monthly_contributions_summary')
+        .select('month_start, total_amount')
+        .order('month_start', { ascending: true });
+        
+      let totalFunds = 0;
+      const formattedChartData: any[] = [];
 
-        if (summaryData) {
-          let previousTotal = 0;
-          summaryData.forEach((item, index) => {
-            const currentTotal = Number(item.total_amount);
-            totalFunds += currentTotal;
-            const monthYear = format(parseISO(item.month_start), 'MMM yyyy', { locale: fr });
-            const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
-            
-            let growth = 0;
-            if (index > 0) {
-              if (previousTotal > 0) {
-                growth = ((currentTotal - previousTotal) / previousTotal) * 100;
-              } else if (currentTotal > 0) {
-                growth = 100;
-              }
+      if (summaryData) {
+        let previousTotal = 0;
+        summaryData.forEach((item, index) => {
+          const currentTotal = Number(item.total_amount);
+          totalFunds += currentTotal;
+          const monthYear = format(parseISO(item.month_start), 'MMM yyyy', { locale: fr });
+          const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+          
+          let growth = 0;
+          if (index > 0) {
+            if (previousTotal > 0) {
+              growth = ((currentTotal - previousTotal) / previousTotal) * 100;
+            } else if (currentTotal > 0) {
+              growth = 100;
             }
+          }
 
-            formattedChartData.push({
-              name: capitalizedMonth,
-              total: currentTotal,
-              growth: Math.round(growth)
-            });
-            
-            previousTotal = currentTotal;
+          formattedChartData.push({
+            name: capitalizedMonth,
+            total: currentTotal,
+            growth: Math.round(growth)
           });
-        }
-
-        // Fetch Upcoming Events
-        const today = new Date().toISOString();
-        const { data: eventsData } = await supabase
-          .from('events')
-          .select('*')
-          .gte('event_date', today)
-          .order('event_date', { ascending: true })
-          .limit(4);
-
-        setStats({
-          totalMembers: totalCount || 0,
-          activeMembers: activeCount || 0,
-          totalFunds,
+          
+          previousTotal = currentTotal;
         });
-        
-        setChartData(formattedChartData);
-        if (eventsData) setUpcomingEvents(eventsData);
-
-      } catch (error) {
-        console.error("Erreur lors du chargement des statistiques:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchStats();
+      // Fetch Upcoming Events
+      const today = new Date().toISOString();
+      const { data: eventsData } = await supabase
+        .from('events')
+        .select('*')
+        .gte('event_date', today)
+        .order('event_date', { ascending: true })
+        .limit(4);
+
+      setStats({
+        totalMembers: totalCount || 0,
+        activeMembers: activeCount || 0,
+        totalFunds,
+      });
+      
+      setChartData(formattedChartData);
+      if (eventsData) setUpcomingEvents(eventsData);
+
+    } catch (error) {
+      console.error("Erreur lors du chargement des statistiques:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchStats();
+
+    const channel = supabase
+      .channel('dashboard_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchStats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sass_contributions' }, () => fetchStats())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => fetchStats())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchStats]);
+
+
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {

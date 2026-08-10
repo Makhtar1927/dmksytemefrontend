@@ -91,8 +91,14 @@ export default function CardsManagement() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
+
+    const channel = supabase
+      .channel('cards_management_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchData())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   // Obtenir le statut de paiement pour un membre

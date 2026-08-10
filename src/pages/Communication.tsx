@@ -83,6 +83,13 @@ const Communication = () => {
   useEffect(() => {
     fetchHistory();
     fetchMembers();
+
+    const channel = supabase
+      .channel('communication_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'communications' }, () => fetchHistory())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleDeleteCommunication = async (id: string) => {

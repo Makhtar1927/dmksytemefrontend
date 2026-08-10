@@ -177,6 +177,16 @@ const Members = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Realtime subscription — re-fetch when members table changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('members_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchMembers())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [page, searchQuery, roleFilter, sectorFilter, sassFilter]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };

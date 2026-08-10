@@ -48,6 +48,13 @@ const Journal = () => {
 
   useEffect(() => {
     fetchLogs();
+
+    const channel = supabase
+      .channel('journal_admin_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, () => fetchLogs())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const filteredLogs = logs.filter((log) => {

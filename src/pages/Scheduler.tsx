@@ -207,7 +207,18 @@ const Scheduler = () => {
       }
     };
     init();
-    return () => { isMounted = false; };
+
+    const channel = supabase
+      .channel('scheduler_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, () => {
+        if (isMounted) fetchEvents();
+      })
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
   }, [fetchEvents, fetchMembers]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

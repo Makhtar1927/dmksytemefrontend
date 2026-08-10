@@ -130,6 +130,15 @@ const Transactions = () => {
 
   useEffect(() => {
     fetchTransactions();
+
+    const channel = supabase
+      .channel('transactions_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sass_contributions' }, () => fetchTransactions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_incomes' }, () => fetchTransactions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_expenses' }, () => fetchTransactions())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
 
