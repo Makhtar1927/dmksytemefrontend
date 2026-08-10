@@ -41,7 +41,8 @@ const SECTORS = [
 
 const ROLES = [
   "Membre Simple", "Membre Bureau", "Dieuwrigne Darou", "Trésorier",
-  "Secrétaire Général", "Vice-Dieuwrigne", "Dieuwrigne", "Administrateur général"
+  "Secrétaire Général", "Vice-Dieuwrigne", "Dieuwrigne", "Administrateur général",
+  "Sage", "Commissaire au compte"
 ];
 
 const Members = () => {

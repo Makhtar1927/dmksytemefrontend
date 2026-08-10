@@ -225,7 +225,7 @@ const Communication = () => {
         let query = supabase.from('members').select('expo_push_token').not('expo_push_token', 'is', null);
         
         if (formData.target_audience === 'Bureau Uniquement') {
-          const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière'];
+          const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
           query = query.in('role', bureauRoles);
         } else if (formData.target_audience === 'Secteur Spécifique') {
           query = query.eq('sector', selectedSector);
@@ -278,7 +278,7 @@ const Communication = () => {
           
           if (formData.target_audience === 'Bureau Uniquement') {
              // Il faut d'abord récupérer les ID des membres du bureau
-             const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière'];
+             const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
              const { data: bMembers } = await supabase.from('members').select('id').in('role', bureauRoles);
              const bIds = bMembers?.map(m => m.id) || [];
              if(bIds.length > 0) pushQuery = pushQuery.in('member_id', bIds);
