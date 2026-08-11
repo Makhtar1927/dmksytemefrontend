@@ -59,7 +59,7 @@ const Communication = () => {
         .from('communications')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(50);
 
       if (!error && data) {
         setHistory(data);
@@ -125,14 +125,21 @@ const Communication = () => {
 
       // 2. Fallback Supabase direct si l'API backend échoue ou est bloquée par CORS
       if (!success) {
-        const { error: sbErr } = await supabase.from('communications').delete().eq('id', id);
+        const { data: deletedRows, error: sbErr } = await supabase
+          .from('communications')
+          .delete()
+          .eq('id', id)
+          .select();
         if (sbErr) throw sbErr;
+        if (!deletedRows || deletedRows.length === 0) {
+          throw new Error("Impossible de supprimer la communication (droits insuffisants ou enregistrement introuvable dans la base).");
+        }
       }
 
       const commToDelete = history.find(h => h.id === id);
       await logActivity('SUPPRESSION', 'SYSTÈME', `Suppression d'une communication envoyée à: ${commToDelete?.target_audience || 'inconnu'}`);
 
-      setHistory(prev => prev.filter(h => h.id !== id));
+      await fetchHistory();
     } catch (err: any) {
       console.error("Erreur suppression:", err);
       alert("Erreur lors de la suppression: " + (err.message || "Impossible d'effectuer l'action."));
@@ -171,14 +178,21 @@ const Communication = () => {
 
       // 2. Fallback Supabase direct
       if (!success) {
-        const { error: sbErr } = await supabase.from('communications').update({ content: editContent }).eq('id', id);
+        const { data: updatedRows, error: sbErr } = await supabase
+          .from('communications')
+          .update({ content: editContent })
+          .eq('id', id)
+          .select();
         if (sbErr) throw sbErr;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error("Impossible de modifier la communication (droits insuffisants ou enregistrement introuvable).");
+        }
       }
 
       const commToUpdate = history.find(h => h.id === id);
       await logActivity('MODIFICATION', 'SYSTÈME', `Modification du message envoyé à: ${commToUpdate?.target_audience || 'inconnu'}`);
 
-      setHistory(prev => prev.map(h => h.id === id ? { ...h, content: editContent } : h));
+      await fetchHistory();
       setEditingId(null);
     } catch (err: any) {
       console.error("Erreur modification:", err);
