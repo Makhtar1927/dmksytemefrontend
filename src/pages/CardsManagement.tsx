@@ -91,11 +91,11 @@ export default function CardsManagement() {
   };
 
   useEffect(() => {
-    fetchData();
+    void fetchData();
 
     const channel = supabase
       .channel('cards_management_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => void fetchData())
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -125,16 +125,28 @@ export default function CardsManagement() {
 
   const handleDownloadCard = async () => {
     if (!cardRef.current || !selectedMember) return;
-    
+
     setIsDownloading(true);
     try {
-      // Force scale to 2 for high quality regardless of the CSS scale
-      const dataUrl = await htmlToImage.toPng(cardRef.current, { 
-        quality: 1, 
+      // Capturer directement cardRef (in-DOM) à sa taille native 800×480.
+      // On surcharge le style pour annuler le transform scale() hérité du parent,
+      // ce qui garantit une capture 1:1 sans décalage et avec toutes les images chargées.
+      const dataUrl = await htmlToImage.toPng(cardRef.current, {
+        quality: 1,
         pixelRatio: 2,
-        backgroundColor: undefined
+        width: 800,
+        height: 480,
+        canvasWidth: 1600,
+        canvasHeight: 960,
+        style: {
+          transform: 'none',
+          transformOrigin: 'top left',
+          borderRadius: '24px',
+        },
+        // Forcer le re-fetch des images pour contourner le cache CORS
+        cacheBust: true,
       });
-      
+
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = `Carte_Membre_${selectedMember.first_name}_${selectedMember.last_name}.png`;
