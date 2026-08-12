@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { uploadMemberPhoto } from '../utils/photoUpload';
 import AdminMemberCard from '../components/AdminMemberCard';
 import * as htmlToImage from 'html-to-image';
 import { 
@@ -185,33 +186,13 @@ export default function CardsManagement() {
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, member: CardMember) => {
     if (!e.target.files || e.target.files.length === 0 || !member?.email) return;
     const file = e.target.files[0];
-    
-    // Validation de la taille (5Mo max)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("La taille de l'image ne doit pas dépasser 5Mo.");
-      return;
-    }
-
     setUploadingMemberId(member.id);
-    const formData = new FormData();
-    formData.append('photo', file);
-    formData.append('email', member.email);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_URL}/api/users/upload-photo`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.status === 'success') {
-        setMembers(members.map(m => m.id === member.id ? { ...m, photo_url: data.photo_url } : m));
-        if (selectedMember?.id === member.id) {
-          setSelectedMember({ ...selectedMember, photo_url: data.photo_url });
-        }
-      } else {
-        throw new Error(data.message || 'Erreur lors de l\'upload');
+      const newPhotoUrl = await uploadMemberPhoto(file, member.email);
+      setMembers(members.map(m => m.id === member.id ? { ...m, photo_url: newPhotoUrl } : m));
+      if (selectedMember?.id === member.id) {
+        setSelectedMember({ ...selectedMember, photo_url: newPhotoUrl });
       }
     } catch (err) {
       console.error("Erreur d'upload de photo:", err);
