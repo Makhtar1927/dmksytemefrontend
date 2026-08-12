@@ -85,119 +85,101 @@ export default function AdminMemberCard({ memberInfo, cardRef }: AdminMemberCard
       </div>
 
       {/* NOM label & value */}
-      <div className="absolute top-[24%] left-[60%] z-10">
+      <div className="absolute top-[23.5%] left-[60%] z-10 whitespace-nowrap">
         <span className="text-[#224857]/60 text-[7.5px] font-extrabold uppercase tracking-wider leading-none block">Nom</span>
       </div>
-      <div className="absolute top-[26%] left-[60%] z-10 w-[16%]">
-        <span className="text-[#193a47] font-black text-[14px] uppercase truncate block leading-none">
+      <div className="absolute top-[26%] left-[60%] w-[17%] z-10 whitespace-nowrap">
+        <span className="text-[#193a47] font-black text-[13px] uppercase truncate block leading-none">
           {formatField(memberInfo.last_name)}
         </span>
       </div>
 
       {/* PRENOM label & value */}
-      <div className="absolute top-[24%] left-[78%] z-10">
+      <div className="absolute top-[23.5%] left-[78%] z-10 whitespace-nowrap">
         <span className="text-[#224857]/60 text-[7.5px] font-extrabold uppercase tracking-wider leading-none block">Prenom</span>
       </div>
-      <div className="absolute top-[26%] left-[78%] z-10 w-[16%]">
-        <span className="text-[#193a47] font-black text-[14px] truncate block leading-none">
+      <div className="absolute top-[26%] left-[78%] w-[17%] z-10 whitespace-nowrap">
+        <span className="text-[#193a47] font-black text-[13px] uppercase truncate block leading-none">
           {formatField(memberInfo.first_name)}
         </span>
       </div>
 
       {/* DATE DE NAISSANCE label & value */}
-      <div className="absolute top-[34%] left-[60%] z-10">
-        <span className="text-[#193a47] font-black text-[11px] leading-none block">
-          {formatDateField(memberInfo.birth_date)}
-        </span>
-      </div>
-      <div className="absolute top-[32%] left-[60%] z-10">
+      <div className="absolute top-[32%] left-[60%] z-10 whitespace-nowrap">
         <span className="text-[#224857]/60 font-extrabold text-[7.5px] uppercase tracking-wider leading-none block">
           Date de naissance
         </span>
       </div>
-
-      {/* LIEU DE NAISSANCE label & value */}
-      <div className="absolute top-[34%] left-[78%] z-10 w-[16%]">
-        <span className="text-[#193a47] font-black text-[11px] uppercase leading-none block truncate">
-          {formatField(memberInfo.birth_place)}
+      <div className="absolute top-[34.5%] left-[60%] z-10 whitespace-nowrap">
+        <span className="text-[#193a47] font-black text-[10px] leading-none block">
+          {formatDateField(memberInfo.birth_date)}
         </span>
       </div>
-      <div className="absolute top-[32%] left-[78%] z-10">
+
+      {/* LIEU DE NAISSANCE label & value */}
+      <div className="absolute top-[32%] left-[78%] z-10 whitespace-nowrap">
         <span className="text-[#224857]/60 font-extrabold text-[7.5px] uppercase tracking-wider leading-none block">
           Lieu de naissance
         </span>
       </div>
+      <div className="absolute top-[34.5%] left-[78%] w-[18%] z-10 whitespace-nowrap">
+        <span className="text-[#193a47] font-black text-[10px] uppercase leading-none block truncate">
+          {formatField(memberInfo.birth_place)}
+        </span>
+      </div>
 
       {/* Vertical List labels & values */}
-      <div className="absolute top-[47.2%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Adresse:</span>
-      </div>
-      <div className="absolute top-[47.2%] left-[62%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.address)}</span>
+      <div className="absolute top-[47.2%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Adresse:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.address)}</span>
       </div>
 
-      <div className="absolute top-[51.7%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Numero CNI:</span>
-      </div>
-      <div className="absolute top-[51.7%] left-[65%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.cni_number)}</span>
+      <div className="absolute top-[51.7%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Numero CNI:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.cni_number)}</span>
       </div>
 
-      <div className="absolute top-[56.2%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Date de delivrance CNI:</span>
-      </div>
-      <div className="absolute top-[56.2%] left-[74%] z-10 w-[15%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatDateField(memberInfo.cni_issue_date)}</span>
+      <div className="absolute top-[56.2%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Date de delivrance CNI:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatDateField(memberInfo.cni_issue_date)}</span>
       </div>
 
-      <div className="absolute top-[60.7%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Telephone:</span>
-      </div>
-      <div className="absolute top-[60.7%] left-[64%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.phone)}</span>
+      <div className="absolute top-[60.7%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Telephone:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.phone)}</span>
       </div>
 
-      <div className="absolute top-[65.2%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Groupe sanguin:</span>
-      </div>
-      <div className="absolute top-[65.2%] left-[69%] z-10 w-[24%]">
-        <span className="text-red-500 text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.blood_type)}</span>
+      <div className="absolute top-[65.2%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Groupe sanguin:</span>
+        <span className="text-red-500 text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.blood_type)}</span>
       </div>
 
-      <div className="absolute top-[69.7%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Date d'adhesion:</span>
-      </div>
-      <div className="absolute top-[69.7%] left-[69%] z-10 w-[24%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatDateField(memberInfo.join_date || memberInfo.created_at)}</span>
+      <div className="absolute top-[69.7%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Date d'adhesion:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatDateField(memberInfo.join_date || memberInfo.created_at)}</span>
       </div>
 
-      <div className="absolute top-[74.2%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Fonction:</span>
-      </div>
-      <div className="absolute top-[74.2%] left-[63%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.role)}</span>
+      <div className="absolute top-[74.2%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Fonction:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.role)}</span>
       </div>
 
-      <div className="absolute top-[78.7%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Secteur:</span>
-      </div>
-      <div className="absolute top-[78.7%] left-[63%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{formatField(memberInfo.sector)}</span>
+      <div className="absolute top-[78.7%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Secteur:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{formatField(memberInfo.sector)}</span>
       </div>
 
-      <div className="absolute top-[83.2%] left-[54%] z-10">
-        <span className="text-[#224857]/70 text-[11px] font-extrabold uppercase leading-none block">Expire le:</span>
-      </div>
-      <div className="absolute top-[83.2%] left-[63%] z-10 w-[30%]">
-        <span className="text-[#193a47] text-[11px] font-extrabold uppercase truncate block leading-none">{expiryFormatted}</span>
+      <div className="absolute top-[83.2%] left-[52.5%] right-[4%] z-10 flex items-baseline gap-1.5 whitespace-nowrap overflow-hidden">
+        <span className="text-[#224857]/70 text-[9.5px] font-extrabold uppercase leading-none shrink-0">Expire le:</span>
+        <span className="text-[#193a47] text-[9.5px] font-extrabold uppercase truncate leading-none">{expiryFormatted}</span>
       </div>
 
       {/* Matricule label & value */}
-      <div className="absolute top-[67.5%] left-[20%] z-10">
-        <span className="text-[#224857]/60 text-[11px] font-extrabold uppercase leading-none block">Numéro Matricule:</span>
+      <div className="absolute top-[67.5%] left-[20%] z-10 whitespace-nowrap">
+        <span className="text-[#224857]/60 text-[9.5px] font-extrabold uppercase leading-none block">Numéro Matricule:</span>
       </div>
-      <div className="absolute top-[72%] left-[20%] text-left z-10">
-        <p className="text-[#193a47] font-mono font-black text-[13px] tracking-wide leading-none">
+      <div className="absolute top-[72%] left-[20%] text-left z-10 whitespace-nowrap">
+        <p className="text-[#193a47] font-mono font-black text-[12px] tracking-wide leading-none">
           {memberInfo.dmk_id || 'NON RENSEIGNÉ'}
         </p>
       </div>
