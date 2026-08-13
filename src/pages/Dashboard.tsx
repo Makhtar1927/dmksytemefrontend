@@ -54,23 +54,42 @@ const Dashboard = () => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'Actif');
 
-      // Fetch Total Funds and Chart Data via SQL View
-      const { data: summaryData } = await supabase
-        .from('monthly_contributions_summary')
-        .select('month_start, total_amount')
-        .order('month_start', { ascending: true });
+      // Fetch Total Funds and Daily Chart Data from sass_contributions
+      const { data: contribsData } = await supabase
+        .from('sass_contributions')
+        .select('amount, payment_date, created_at, status')
+        .order('payment_date', { ascending: true });
         
       let totalFunds = 0;
       const formattedChartData: any[] = [];
 
-      if (summaryData) {
+      if (contribsData && contribsData.length > 0) {
+        const dailyMap: { [dateStr: string]: number } = {};
+
+        contribsData.forEach((item) => {
+          const rawDate = item.payment_date || item.created_at;
+          if (!rawDate) return;
+          const dateObj = new Date(rawDate);
+          if (isNaN(dateObj.getTime())) return;
+
+          const dayKey = dateObj.toISOString().split('T')[0];
+          const amount = Number(item.amount || 0);
+
+          if (item.status === 'Validé' || item.status === 'Valide' || !item.status) {
+            totalFunds += amount;
+            dailyMap[dayKey] = (dailyMap[dayKey] || 0) + amount;
+          }
+        });
+
+        const sortedDays = Object.keys(dailyMap).sort();
         let previousTotal = 0;
-        summaryData.forEach((item, index) => {
-          const currentTotal = Number(item.total_amount);
-          totalFunds += currentTotal;
-          const monthYear = format(parseISO(item.month_start), 'MMM yyyy', { locale: fr });
-          const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
-          
+
+        sortedDays.forEach((dayKey, index) => {
+          const currentTotal = dailyMap[dayKey];
+          const dateObj = parseISO(dayKey);
+          const formattedDay = format(dateObj, 'dd MMM', { locale: fr });
+          const capitalizedDay = formattedDay.charAt(0).toUpperCase() + formattedDay.slice(1);
+
           let growth = 0;
           if (index > 0) {
             if (previousTotal > 0) {
@@ -81,13 +100,48 @@ const Dashboard = () => {
           }
 
           formattedChartData.push({
-            name: capitalizedMonth,
+            name: capitalizedDay,
             total: currentTotal,
             growth: Math.round(growth)
           });
-          
+
           previousTotal = currentTotal;
         });
+      }
+
+      // Fallback si pas de données quotidiennes directes
+      if (formattedChartData.length === 0) {
+        const { data: summaryData } = await supabase
+          .from('monthly_contributions_summary')
+          .select('month_start, total_amount')
+          .order('month_start', { ascending: true });
+
+        if (summaryData) {
+          let previousTotal = 0;
+          summaryData.forEach((item, index) => {
+            const currentTotal = Number(item.total_amount);
+            totalFunds += currentTotal;
+            const monthYear = format(parseISO(item.month_start), 'MMM yyyy', { locale: fr });
+            const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+            
+            let growth = 0;
+            if (index > 0) {
+              if (previousTotal > 0) {
+                growth = ((currentTotal - previousTotal) / previousTotal) * 100;
+              } else if (currentTotal > 0) {
+                growth = 100;
+              }
+            }
+
+            formattedChartData.push({
+              name: capitalizedMonth,
+              total: currentTotal,
+              growth: Math.round(growth)
+            });
+            
+            previousTotal = currentTotal;
+          });
+        }
       }
 
       // Fetch Upcoming Events
@@ -193,7 +247,7 @@ const Dashboard = () => {
           <div className="flex justify-between items-center mb-6 relative z-10">
             <div>
               <h3 className="text-xl font-bold text-foreground">Évolution des Contributions</h3>
-              <p className="text-sm text-muted-foreground mt-1">Aperçu mensuel des encaissements Sass</p>
+              <p className="text-sm text-muted-foreground mt-1">Aperçu quotidien des encaissements Sass</p>
             </div>
           </div>
           <div className="flex-1 w-full h-full min-h-[300px] relative z-10">
