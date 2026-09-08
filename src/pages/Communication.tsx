@@ -225,13 +225,18 @@ const Communication = () => {
         audienceLog = `Membre: ${m ? m.first_name + ' ' + m.last_name : selectedMember}`;
       }
 
+      const notificationTitle = "Nouvelle Alerte DMK 🔔";
+      const isPersonal = formData.target_audience === 'Membre Spécifique';
+
       const { error } = await supabase.from('communications').insert([
         {
+          title: notificationTitle,
           type: formData.type,
           target_audience: audienceLog,
           content: formData.content,
           status: 'Envoyé',
-          created_by: user?.email || 'Admin'
+          created_by: user?.email || 'Admin',
+          recipient_id: isPersonal ? selectedMember : null,
         }
       ]);
 
@@ -240,94 +245,83 @@ const Communication = () => {
       await logActivity('CRÉATION', 'SYSTÈME', `Envoi d'une communication (${formData.type}) à: ${audienceLog}`);
 
       // ---------------------------------------------------------
-      // ENVOI DES NOTIFICATIONS PUSH NATIVES (SONNERIE + BANNIÈRE)
+      // ENVOI DES NOTIFICATIONS PUSH MULTIPLATEFORME (FLUTTER + PWA)
       // ---------------------------------------------------------
-      if (formData.type === 'Push Application') {
-        let query = supabase.from('members').select('expo_push_token').not('expo_push_token', 'is', null);
-        
-        if (formData.target_audience === 'Bureau Uniquement') {
-          const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
-          query = query.in('role', bureauRoles);
-        } else if (formData.target_audience === 'Secteur Spécifique') {
-          query = query.eq('sector', selectedSector);
-        } else if (formData.target_audience === 'Membre Spécifique') {
-          query = query.eq('id', selectedMember);
-        }
-        
-        const { data: membersWithTokens } = await query;
-        const tokens = membersWithTokens?.map(m => m.expo_push_token).filter(Boolean) || [];
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const productionUrl = 'https://dmksytemebackend.onrender.com';
+      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
 
-        if (tokens.length > 0) {
-          const CHUNK_SIZE = 100;
-          for (let i = 0; i < tokens.length; i += CHUNK_SIZE) {
-            const chunk = tokens.slice(i, i + CHUNK_SIZE);
-            const messages = chunk.map(token => ({
-              to: token,
-              sound: 'default',
-              title: "Nouvelle Alerte DMK",
-              body: formData.content,
-              priority: 'high',
-              categoryId: 'message',
-              channelId: 'default',
-              data: { withSome: 'data' },
-            }));
+      // 1. Déterminer les membres cibles
+      let targetMemberIds: string[] | null = null;
+      if (formData.target_audience === 'Bureau Uniquement') {
+        const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
+        const { data: bMembers } = await supabase.from('members').select('id').in('role', bureauRoles);
+        targetMemberIds = bMembers?.map(m => m.id) || [];
+      } else if (formData.target_audience === 'Secteur Spécifique') {
+        const { data: sMembers } = await supabase.from('members').select('id').eq('sector', selectedSector);
+        targetMemberIds = sMembers?.map(m => m.id) || [];
+      } else if (formData.target_audience === 'Membre Spécifique') {
+        targetMemberIds = selectedMember ? [selectedMember] : [];
+      }
 
-            // Routage de la requête via notre backend Render pour éviter le CORS
-            try {
-              const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-              const productionUrl = 'https://dmksytemebackend.onrender.com';
-              const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
-              
-              await fetch(`${baseUrl}/api/notifications/send`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(messages),
-              });
-            } catch (pushErr) {
-              console.warn("Push notification non envoyée, mais le message est enregistré.", pushErr);
-            }
+      // Si une audience ciblée est vide, ne pas envoyer de push
+      const shouldSkipPush = targetMemberIds !== null && targetMemberIds.length === 0;
+
+      if (!shouldSkipPush) {
+        // =========================================================
+        // A. ENVOI AUX SMARTPHONES ANDROID / IOS (APP FLUTTER VIA FCM)
+        // =========================================================
+        try {
+          let fcmQuery = supabase.from('members').select('id, fcm_token').not('fcm_token', 'is', null);
+          if (targetMemberIds) {
+            fcmQuery = fcmQuery.in('id', targetMemberIds);
           }
+
+          const { data: fcmMembers } = await fcmQuery;
+          const fcmTokens = fcmMembers?.map(m => m.fcm_token).filter(Boolean) || [];
+
+          if (fcmTokens.length > 0) {
+            await fetch(`${baseUrl}/api/notifications/fcm-send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tokens: fcmTokens,
+                payload: {
+                  title: notificationTitle,
+                  body: formData.content,
+                  data: {
+                    channel: 'alerts',
+                    timestamp: Date.now().toString(),
+                    audience: audienceLog,
+                  }
+                }
+              }),
+            });
+          }
+        } catch (fcmErr) {
+          console.warn("Erreur lors de l'envoi push FCM Flutter:", fcmErr);
         }
 
         // =========================================================
-        // ENVOI DES NOTIFICATIONS PUSH WEB (PWA)
+        // B. ENVOI DES NOTIFICATIONS PUSH WEB (PWA MEMBER-WEB)
         // =========================================================
         try {
           let pushQuery = supabase.from('push_subscriptions').select('member_id, subscription');
-          
-          if (formData.target_audience === 'Bureau Uniquement') {
-             // Il faut d'abord récupérer les ID des membres du bureau
-             const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
-             const { data: bMembers } = await supabase.from('members').select('id').in('role', bureauRoles);
-             const bIds = bMembers?.map(m => m.id) || [];
-             if(bIds.length > 0) pushQuery = pushQuery.in('member_id', bIds);
-             else pushQuery = pushQuery.eq('member_id', 'none'); // Ne rien envoyer
-          } else if (formData.target_audience === 'Secteur Spécifique') {
-             const { data: sMembers } = await supabase.from('members').select('id').eq('sector', selectedSector);
-             const sIds = sMembers?.map(m => m.id) || [];
-             if(sIds.length > 0) pushQuery = pushQuery.in('member_id', sIds);
-             else pushQuery = pushQuery.eq('member_id', 'none');
-          } else if (formData.target_audience === 'Membre Spécifique') {
-            pushQuery = pushQuery.eq('member_id', selectedMember);
+          if (targetMemberIds) {
+            pushQuery = pushQuery.in('member_id', targetMemberIds);
           }
 
           const { data: webPushSubs } = await pushQuery;
           const subscriptions = webPushSubs?.map(s => s.subscription) || [];
 
           if (subscriptions.length > 0) {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-            const productionUrl = 'https://dmksytemebackend.onrender.com';
-            const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
-
             await fetch(`${baseUrl}/api/notifications/web-push-send`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 subscriptions,
                 payload: {
-                  title: "Nouvelle Alerte DMK",
+                  title: notificationTitle,
                   body: formData.content,
                   data: {
                     dateOfArrival: Date.now(),
@@ -338,7 +332,40 @@ const Communication = () => {
             });
           }
         } catch (webPushErr) {
-          console.warn("Erreur lors de l'envoi des notifications Web Push:", webPushErr);
+          console.warn("Erreur lors de l'envoi des notifications Web Push PWA:", webPushErr);
+        }
+
+        // =========================================================
+        // C. ENVOI DE SECOURS EXPO PUSH (Si d'anciens appareils sont présents)
+        // =========================================================
+        try {
+          let expoQuery = supabase.from('members').select('expo_push_token').not('expo_push_token', 'is', null);
+          if (targetMemberIds) {
+            expoQuery = expoQuery.in('id', targetMemberIds);
+          }
+
+          const { data: expoMembers } = await expoQuery;
+          const expoTokens = expoMembers?.map(m => m.expo_push_token).filter(Boolean) || [];
+
+          if (expoTokens.length > 0) {
+            const messages = expoTokens.map(token => ({
+              to: token,
+              sound: 'default',
+              title: notificationTitle,
+              body: formData.content,
+              priority: 'high',
+              categoryId: 'message',
+              channelId: 'default',
+            }));
+
+            await fetch(`${baseUrl}/api/notifications/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(messages),
+            });
+          }
+        } catch (expoErr) {
+          console.warn("Erreur Expo fallback:", expoErr);
         }
       }
       // ---------------------------------------------------------
