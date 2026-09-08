@@ -98,41 +98,34 @@ const Communication = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non connecté");
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const productionUrl = 'https://dmksytemebackend.onrender.com';
-      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+      const API_URL = import.meta.env.VITE_API_URL;
+      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
 
-      let success = false;
+      // 1. Suppression directe dans Supabase (instantané et sécurisé)
+      const { error: sbErr } = await supabase
+        .from('communications')
+        .delete()
+        .eq('id', id);
 
-      // 1. Tentative API Backend
-      try {
-        const response = await fetch(`${baseUrl}/api/communications/delete`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ communicationId: id })
-        });
+      if (sbErr) {
+        console.warn("Suppression Supabase directe restreinte, tentative via API backend:", sbErr);
+        // 2. Fallback API Backend si RLS restreint
+        try {
+          const response = await fetch(`${baseUrl}/api/communications/delete`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ communicationId: id })
+          });
 
-        const result = await response.json();
-        if (response.ok && result.status === 'success') {
-          success = true;
-        }
-      } catch (fetchErr) {
-        console.warn("Backend API indisponible, tentative suppression directe Supabase:", fetchErr);
-      }
-
-      // 2. Fallback Supabase direct si l'API backend échoue ou est bloquée par CORS
-      if (!success) {
-        const { data: deletedRows, error: sbErr } = await supabase
-          .from('communications')
-          .delete()
-          .eq('id', id)
-          .select();
-        if (sbErr) throw sbErr;
-        if (!deletedRows || deletedRows.length === 0) {
-          throw new Error("Impossible de supprimer la communication (droits insuffisants ou enregistrement introuvable dans la base).");
+          const result = await response.json();
+          if (!response.ok || result.status !== 'success') {
+            throw new Error(result.message || "Erreur lors de la suppression backend");
+          }
+        } catch (fetchErr: any) {
+          throw new Error("Impossible de supprimer la communication : " + (sbErr.message || fetchErr.message));
         }
       }
 
@@ -247,9 +240,8 @@ const Communication = () => {
       // ---------------------------------------------------------
       // ENVOI DES NOTIFICATIONS PUSH MULTIPLATEFORME (FLUTTER + PWA)
       // ---------------------------------------------------------
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const productionUrl = 'https://dmksytemebackend.onrender.com';
-      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+      const API_URL = import.meta.env.VITE_API_URL;
+      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
 
       // 1. Déterminer les membres cibles
       let targetMemberIds: string[] | null = null;

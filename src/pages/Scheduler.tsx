@@ -97,13 +97,19 @@ const Scheduler = () => {
     try {
       const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
 
+      const mapParticipant = (m: any): MeetingParticipant => ({
+        ...m,
+        full_name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || m.email,
+        avatar_url: m.photo_url || ''
+      });
+
       // 1. Membres du Bureau
       const { data: bm } = await supabase
         .from('members')
-        .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+        .select('id, first_name, last_name, email, role, photo_url')
         .in('role', bureauRoles)
         .order('first_name');
-      if (bm) setBureauMembers(bm as MeetingParticipant[]);
+      if (bm) setBureauMembers(bm.map(mapParticipant));
 
       // 2. Présences confirmées
       const { data: att } = await supabase
@@ -115,9 +121,9 @@ const Scheduler = () => {
         const emails = att.map((a: { member_email: string }) => a.member_email);
         const { data: attendeeProfiles } = await supabase
           .from('members')
-          .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+          .select('id, first_name, last_name, email, role, photo_url')
           .in('email', emails);
-        if (attendeeProfiles) setConfirmedAttendees(attendeeProfiles as MeetingParticipant[]);
+        if (attendeeProfiles) setConfirmedAttendees(attendeeProfiles.map(mapParticipant));
       }
 
       // 3. Suivi en direct (meeting_viewers)
@@ -131,9 +137,9 @@ const Scheduler = () => {
         const vEmails = viewers.map((v: { member_email: string }) => v.member_email);
         const { data: viewerProfiles } = await supabase
           .from('members')
-          .select('id, first_name, last_name, full_name, email, role, photo_url, avatar_url')
+          .select('id, first_name, last_name, email, role, photo_url')
           .in('email', vEmails);
-        if (viewerProfiles) setLiveViewers(viewerProfiles as MeetingParticipant[]);
+        if (viewerProfiles) setLiveViewers(viewerProfiles.map(mapParticipant));
       }
     } catch (err) {
       console.warn("Erreur chargement gestion:", err);
@@ -308,9 +314,8 @@ const Scheduler = () => {
           }]);
 
           // Déclencher l'envoi Push FCM (Mobile Flutter) et Web Push (PWA Member-Web)
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-          const productionUrl = 'https://dmksytemebackend.onrender.com';
-          const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+          const API_URL = import.meta.env.VITE_API_URL;
+          const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
 
           let targetMemberIds: string[] | null = null;
           if (formData.target_audience === 'Bureau Uniquement') {
