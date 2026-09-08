@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Search, Loader2, X, Edit, Shield, CheckCircle, ArrowDownRight, ArrowUpRight, Lock, Mail, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../utils/apiUrl';
 
 type TransactionType = 'Sass' | 'Revenu' | 'Dépense';
 
@@ -182,8 +183,7 @@ const Transactions = () => {
     setAuthError('');
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
+      const baseUrl = getApiUrl();
 
       const updateData = {
         amount: Number(editAmount),

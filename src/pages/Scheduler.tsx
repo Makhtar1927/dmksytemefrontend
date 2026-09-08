@@ -7,6 +7,7 @@ import { fr } from 'date-fns/locale';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../utils/logger';
+import { getApiUrl } from '../utils/apiUrl';
 
 const locales = {
   'fr': fr,
@@ -314,8 +315,7 @@ const Scheduler = () => {
           }]);
 
           // Déclencher l'envoi Push FCM (Mobile Flutter) et Web Push (PWA Member-Web)
-          const API_URL = import.meta.env.VITE_API_URL;
-          const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
+          const baseUrl = getApiUrl();
 
           let targetMemberIds: string[] | null = null;
           if (formData.target_audience === 'Bureau Uniquement') {

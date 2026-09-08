@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { logActivity } from '../utils/logger';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getApiUrl } from '../utils/apiUrl';
 
 const Communication = () => {
   const { user } = useAuth();
@@ -98,8 +99,7 @@ const Communication = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non connecté");
 
-      const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
+      const baseUrl = getApiUrl();
 
       // 1. Suppression directe dans Supabase (instantané et sécurisé)
       const { error: sbErr } = await supabase
@@ -144,9 +144,7 @@ const Communication = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Non connecté");
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const productionUrl = 'https://dmksytemebackend-dfjz.onrender.com';
-      const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+      const baseUrl = getApiUrl();
 
       let success = false;
 
@@ -240,8 +238,7 @@ const Communication = () => {
       // ---------------------------------------------------------
       // ENVOI DES NOTIFICATIONS PUSH MULTIPLATEFORME (FLUTTER + PWA)
       // ---------------------------------------------------------
-      const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
+      const baseUrl = getApiUrl();
 
       // 1. Déterminer les membres cibles
       let targetMemberIds: string[] | null = null;

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Search, Plus, MoreVertical, Shield, Loader2, X, Edit, Trash2, Power, CheckCircle, Copy, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../utils/logger';
+import { getApiUrl } from '../utils/apiUrl';
 
 type Member = {
   id: string;
@@ -292,7 +293,7 @@ const Members = () => {
         const newEmail = formData.email ? formData.email.trim().toLowerCase() : null;
         
         if (oldEmail && newEmail && oldEmail !== newEmail) {
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const API_URL = getApiUrl();
           const updateEmailResponse = await fetch(`${API_URL}/api/users/update-email`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -377,7 +378,7 @@ const Members = () => {
         };
 
         // 3. Appel de l'API Backend pour créer le compte et insérer en DB simultanément
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const API_URL = getApiUrl();
         const response = await fetch(`${API_URL}/api/users/create`, {
           method: 'POST',
           headers: {
@@ -1089,7 +1090,7 @@ const Members = () => {
                 setIsResetting(true);
                 setResetError('');
                 try {
-                  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                  const API_URL = getApiUrl();
                   const response = await fetch(`${API_URL}/api/users/reset-password`, {
                     method: 'POST',
                     headers: {

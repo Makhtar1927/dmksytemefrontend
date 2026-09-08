@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, Mail, Lock, User, Phone, FileText, Coins, ArrowRight, ArrowLeft, CheckCircle, Clock, ShieldCheck, FileCheck, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getApiUrl } from '../utils/apiUrl';
 
 const SECTORS = [
   "Vaisselle", "Café", "Restauration", "Organisation", "Sonorisation",
@@ -76,7 +77,7 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = getApiUrl();
       const response = await fetch(`${API_URL}/api/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
