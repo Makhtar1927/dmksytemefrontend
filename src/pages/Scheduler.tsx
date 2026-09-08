@@ -297,12 +297,89 @@ const Scheduler = () => {
 
         try {
           const visioInfo = formData.meet_url ? ` 🎥 Lien Visio: ${formData.meet_url}` : '';
+          const notifTitle = `📅 Nouvelle Réunion/Événement: ${formData.title}`;
+          const notifBody = `Vous êtes invité(e) à la réunion "${formData.title}" prévue le ${format(new Date(eventDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })}.${visioInfo}`;
+
           await supabase.from('communications').insert([{
-            title: `📅 Nouvelle Réunion/Événement: ${formData.title}`,
-            content: `Vous êtes invité(e) à la réunion "${formData.title}" prévue le ${format(new Date(eventDate), "dd MMMM yyyy 'à' HH:mm", { locale: fr })}.${visioInfo}`,
+            title: notifTitle,
+            content: notifBody,
             type: 'Push Application',
             target_audience: formData.target_audience
           }]);
+
+          // Déclencher l'envoi Push FCM (Mobile Flutter) et Web Push (PWA Member-Web)
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const productionUrl = 'https://dmksytemebackend.onrender.com';
+          const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
+
+          let targetMemberIds: string[] | null = null;
+          if (formData.target_audience === 'Bureau Uniquement') {
+            const bureauRoles = ['Membre Bureau', 'Secrétaire Général', 'Secrétaire Générale', 'Présidence (DG/SG)', 'Dieuwrigne', 'Vice-Dieuwrigne', 'Vice Dieuwrigne', 'Trésorier', 'Trésorier Général', 'Trésorière', 'Sage', 'Commissaire au compte'];
+            const { data: bMembers } = await supabase.from('members').select('id').in('role', bureauRoles);
+            targetMemberIds = bMembers?.map(m => m.id) || [];
+          } else if (formData.target_audience === 'Secteur Spécifique' && formData.target_sector) {
+            const { data: sMembers } = await supabase.from('members').select('id').eq('sector', formData.target_sector);
+            targetMemberIds = sMembers?.map(m => m.id) || [];
+          } else if (formData.target_audience === 'Membre Spécifique' && formData.target_member_id) {
+            targetMemberIds = [formData.target_member_id];
+          }
+
+          // A. Push FCM vers smartphones Flutter
+          try {
+            let fcmQuery = supabase.from('members').select('id, fcm_token').not('fcm_token', 'is', null);
+            if (targetMemberIds) fcmQuery = fcmQuery.in('id', targetMemberIds);
+            const { data: fcmMembers } = await fcmQuery;
+            const fcmTokens = fcmMembers?.map(m => m.fcm_token).filter(Boolean) || [];
+
+            if (fcmTokens.length > 0) {
+              await fetch(`${baseUrl}/api/notifications/fcm-send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  tokens: fcmTokens,
+                  payload: {
+                    title: notifTitle,
+                    body: notifBody,
+                    data: {
+                      channel: 'alerts',
+                      timestamp: Date.now().toString(),
+                      type: 'new_event',
+                    }
+                  }
+                }),
+              });
+            }
+          } catch (fcmErr) {
+            console.warn("Erreur envoi FCM événement:", fcmErr);
+          }
+
+          // B. Push Web vers PWA
+          try {
+            let pushQuery = supabase.from('push_subscriptions').select('member_id, subscription');
+            if (targetMemberIds) pushQuery = pushQuery.in('member_id', targetMemberIds);
+            const { data: webPushSubs } = await pushQuery;
+            const subscriptions = webPushSubs?.map(s => s.subscription) || [];
+
+            if (subscriptions.length > 0) {
+              await fetch(`${baseUrl}/api/notifications/web-push-send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  subscriptions,
+                  payload: {
+                    title: notifTitle,
+                    body: notifBody,
+                    data: {
+                      channelId: 'dmk_alerts',
+                    }
+                  }
+                }),
+              });
+            }
+          } catch (wpErr) {
+            console.warn("Erreur envoi Web Push événement:", wpErr);
+          }
+
         } catch (notifErr) {
           console.warn("Notification non envoyée mais événement créé", notifErr);
         }
