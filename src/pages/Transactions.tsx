@@ -183,7 +183,7 @@ const Transactions = () => {
     
     try {
       const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
+      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
 
       const updateData = {
         amount: Number(editAmount),

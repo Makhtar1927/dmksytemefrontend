@@ -99,7 +99,7 @@ const Communication = () => {
       if (!session) throw new Error("Non connecté");
 
       const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
+      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
 
       // 1. Suppression directe dans Supabase (instantané et sécurisé)
       const { error: sbErr } = await supabase
@@ -145,7 +145,7 @@ const Communication = () => {
       if (!session) throw new Error("Non connecté");
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const productionUrl = 'https://dmksytemebackend.onrender.com';
+      const productionUrl = 'https://dmksytemebackend-dfjz.onrender.com';
       const baseUrl = window.location.hostname === 'localhost' ? API_URL : productionUrl;
 
       let success = false;
@@ -241,7 +241,7 @@ const Communication = () => {
       // ENVOI DES NOTIFICATIONS PUSH MULTIPLATEFORME (FLUTTER + PWA)
       // ---------------------------------------------------------
       const API_URL = import.meta.env.VITE_API_URL;
-      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend.onrender.com');
+      const baseUrl = API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://dmksytemebackend-dfjz.onrender.com');
 
       // 1. Déterminer les membres cibles
       let targetMemberIds: string[] | null = null;
