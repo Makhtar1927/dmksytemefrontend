@@ -1,7 +1,7 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { QRCode } from 'react-qr-code';
-import cardBackground from '../assets/Carte Membre.png';
+import cardBackground from '../assets/Carte_Membre.webp';
 
 interface AdminMemberCardProps {
   memberInfo: {
