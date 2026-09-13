@@ -11,8 +11,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 // ─────────────────────────────────────────────────────────────
 if (typeof Node === 'function' && Node.prototype) {
   const _insertBefore = Node.prototype.insertBefore;
-  // @ts-expect-error – cast intentionnel pour sécuriser le DOM global
-  Node.prototype.insertBefore = function (newNode: Node, refNode: Node | null) {
+  (Node.prototype as any).insertBefore = function (newNode: Node, refNode: Node | null) {
     if (refNode && refNode.parentNode !== this) {
       try {
         return _insertBefore.call(this, newNode, null);
@@ -30,8 +29,7 @@ if (typeof Node === 'function' && Node.prototype) {
   };
 
   const _removeChild = Node.prototype.removeChild;
-  // @ts-expect-error – idem
-  Node.prototype.removeChild = function (child: Node) {
+  (Node.prototype as any).removeChild = function (child: Node) {
     if (child.parentNode !== this) {
       console.warn('[DOM Shield] removeChild absorbé (nœud orphelin)');
       return child;
