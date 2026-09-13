@@ -146,6 +146,8 @@ export default function CardsManagement() {
         },
         // Forcer le re-fetch des images pour contourner le cache CORS
         cacheBust: true,
+        // Évite SecurityError lors de l'inspection de document.styleSheets (Google Fonts, Google Translate, extensions)
+        skipFonts: true,
       });
 
       const link = document.createElement('a');

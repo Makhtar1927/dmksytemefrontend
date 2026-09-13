@@ -55,10 +55,14 @@ const Dashboard = () => {
         .eq('status', 'Actif');
 
       // Fetch Total Funds and Daily Chart Data from sass_contributions
-      const { data: contribsData } = await supabase
+      const { data: contribsData, error: contribsError } = await supabase
         .from('sass_contributions')
-        .select('amount, payment_date, created_at, status')
+        .select('amount, payment_date, status')
         .order('payment_date', { ascending: true });
+
+      if (contribsError) {
+        console.error("Erreur lors de la récupération des contributions:", contribsError);
+      }
         
       let totalFunds = 0;
       const formattedChartData: any[] = [];
@@ -67,7 +71,7 @@ const Dashboard = () => {
         const dailyMap: { [dateStr: string]: number } = {};
 
         contribsData.forEach((item) => {
-          const rawDate = item.payment_date || item.created_at;
+          const rawDate = item.payment_date;
           if (!rawDate) return;
           const dateObj = new Date(rawDate);
           if (isNaN(dateObj.getTime())) return;
@@ -252,8 +256,8 @@ const Dashboard = () => {
           </div>
           <div className="flex-1 w-full h-full min-h-[300px] relative z-10">
             {chartData.length > 0 ? (
-              <div style={{ width: '100%', height: 300, minWidth: 0 }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <div className="w-full h-[300px] min-w-0">
+                <ResponsiveContainer width="100%" height={300} minWidth={0} minHeight={300}>
                   <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
