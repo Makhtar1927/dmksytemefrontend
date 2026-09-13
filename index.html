@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="google" content="notranslate" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/png" href="/dmk-icon.png" />
     <link rel="apple-touch-icon" href="/dmk-icon.png" sizes="192x192" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -12,6 +15,58 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap" rel="stylesheet" crossorigin="anonymous">
     <title>DMK Admin</title>
+
+    <!-- DOM SHIELD v3 SYNCHRONE ULTRA-SÉCURISÉ -->
+    <!-- Intercepte les mutations sauvages provoquées par Google Translate ou les extensions -->
+    <!-- s'exécute AVANT le chargement de React pour une immunité totale -->
+    <script>
+      (function() {
+        if (typeof Node === 'undefined' || !Node.prototype) return;
+        
+        var _origInsert = Node.prototype.insertBefore;
+        Node.prototype.insertBefore = function(newNode, refNode) {
+          // Si le nœud de référence n'est plus un enfant direct de ce parent
+          if (refNode && refNode.parentNode !== this) {
+            try {
+              return _origInsert.call(this, newNode, null);
+            } catch (e) {
+              return newNode;
+            }
+          }
+          try {
+            return _origInsert.call(this, newNode, refNode);
+          } catch (err) {
+            // Tente une insertion de secours à la fin (append)
+            try {
+              return _origInsert.call(this, newNode, null);
+            } catch (fallbackErr) {
+              return newNode;
+            }
+          }
+        };
+
+        var _origRemove = Node.prototype.removeChild;
+        Node.prototype.removeChild = function(child) {
+          if (child && child.parentNode !== this) {
+            return child;
+          }
+          try {
+            return _origRemove.call(this, child);
+          } catch (err) {
+            return child;
+          }
+        };
+
+        // Nettoyage de tout ancien Service Worker zombie susceptible de bloquer les assets
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            for (var i = 0; i < regs.length; i++) {
+              regs[i].unregister();
+            }
+          }).catch(function() {});
+        }
+      })();
+    </script>
   </head>
   <body translate="no" class="notranslate">
     <div id="root" translate="no" class="notranslate"></div>
