@@ -10,32 +10,32 @@ import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 // Stratégie : interception globale et résilience face aux nœuds orphelins
 // ─────────────────────────────────────────────────────────────
 if (typeof Node === 'function' && Node.prototype) {
-  const _insertBefore = Node.prototype.insertBefore;
-  (Node.prototype as any).insertBefore = function (newNode: Node, refNode: Node | null) {
+  const originalInsertBefore = Node.prototype.insertBefore;
+  Node.prototype.insertBefore = function <T extends Node>(newNode: T, refNode: Node | null): T {
     if (refNode && refNode.parentNode !== this) {
       try {
-        return _insertBefore.call(this, newNode, null);
+        return originalInsertBefore.call(this, newNode, null) as T;
       } catch {
         console.warn('[DOM Shield] insertBefore absorbé (nœud orphelin)');
         return newNode;
       }
     }
     try {
-      return _insertBefore.call(this, newNode, refNode);
+      return originalInsertBefore.call(this, newNode, refNode) as T;
     } catch {
       console.warn('[DOM Shield] insertBefore absorbé (erreur inattendue)');
       return newNode;
     }
   };
 
-  const _removeChild = Node.prototype.removeChild;
-  (Node.prototype as any).removeChild = function (child: Node) {
+  const originalRemoveChild = Node.prototype.removeChild;
+  Node.prototype.removeChild = function <T extends Node>(child: T): T {
     if (child.parentNode !== this) {
       console.warn('[DOM Shield] removeChild absorbé (nœud orphelin)');
       return child;
     }
     try {
-      return _removeChild.call(this, child);
+      return originalRemoveChild.call(this, child) as T;
     } catch {
       console.warn('[DOM Shield] removeChild absorbé (erreur inattendue)');
       return child;
