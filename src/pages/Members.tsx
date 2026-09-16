@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Plus, MoreVertical, Shield, Loader2, X, Edit, Trash2, Power, CheckCircle, Copy, Key } from 'lucide-react';
+import { Search, Plus, MoreVertical, Shield, Loader2, X, Edit, Trash2, Power, CheckCircle, Copy, Key, Clock, UserCheck, Bell } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { logActivity } from '../utils/logger';
 import { getApiUrl } from '../utils/apiUrl';
@@ -56,6 +56,8 @@ const Members = () => {
   const [roleFilter, setRoleFilter] = useState('Tous les rôles');
   const [sectorFilter, setSectorFilter] = useState('Tous les secteurs');
   const [sassFilter, setSassFilter] = useState('Tous les Sass');
+  const [statusFilter, setStatusFilter] = useState('Tous les statuts');
+  const [pendingCount, setPendingCount] = useState(0);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -129,6 +131,9 @@ const Members = () => {
       if (sectorFilter !== 'Tous les secteurs') {
         query = query.eq('sector', sectorFilter);
       }
+      if (statusFilter !== 'Tous les statuts') {
+        query = query.eq('status', statusFilter);
+      }
       if (sassFilter !== 'Tous les Sass') {
         if (sassFilter === 'Magal/Gamou') query = query.gt('sass_magal', 0);
         if (sassFilter === 'Ziaar') query = query.gt('sass_ziaar', 0);
@@ -150,6 +155,13 @@ const Members = () => {
       
       setMembers(data || []);
       setTotalPages(count ? Math.ceil(count / ITEMS_PER_PAGE) : 1);
+
+      // Count pending members separately for the banner
+      const { count: pCount } = await supabase
+        .from('members')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'En attente');
+      setPendingCount(pCount || 0);
     } catch (err: any) {
       console.error('Erreur lors du chargement des membres:', err.message);
       setError('Impossible de charger la liste des membres. Avez-vous exécuté le script SQL dans Supabase ?');
@@ -161,12 +173,12 @@ const Members = () => {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, roleFilter, sectorFilter, sassFilter]);
+  }, [searchQuery, roleFilter, sectorFilter, sassFilter, statusFilter]);
 
   // Fetch when page or filters change
   useEffect(() => {
     fetchMembers();
-  }, [page, searchQuery, roleFilter, sectorFilter, sassFilter]);
+  }, [page, searchQuery, roleFilter, sectorFilter, sassFilter, statusFilter]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -186,7 +198,7 @@ const Members = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [page, searchQuery, roleFilter, sectorFilter, sassFilter]);
+  }, [page, searchQuery, roleFilter, sectorFilter, sassFilter, statusFilter]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -434,6 +446,7 @@ const Members = () => {
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     setActiveDropdown(null);
+    // En attente -> Actif ; Actif -> Inactif ; Inactif -> Actif
     const newStatus = currentStatus === 'Actif' ? 'Inactif' : 'Actif';
     
     try {
@@ -451,6 +464,26 @@ const Members = () => {
       }
     } catch (err: any) {
       alert("Erreur lors de la modification du statut.");
+    }
+  };
+
+  const handleValidatePending = async (id: string) => {
+    setActiveDropdown(null);
+    if (!window.confirm("Valider ce compte et l'activer ? Le membre pourra se connecter immédiatement.")) return;
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({ status: 'Actif' })
+        .eq('id', id);
+      if (error) throw error;
+      setMembers(members.map(m => m.id === id ? { ...m, status: 'Actif' } : m));
+      setPendingCount(c => Math.max(0, c - 1));
+      const member = members.find(m => m.id === id);
+      if (member) {
+        await logActivity('VALIDATION', 'MEMBRE', `Compte validé et activé pour ${member.first_name} ${member.last_name} (${member.dmk_id})`, member.sector || 'N/A');
+      }
+    } catch (err: any) {
+      alert("Erreur lors de la validation du compte.");
     }
   };
 
@@ -492,6 +525,32 @@ const Members = () => {
           Ajouter un Membre
         </button>
       </div>
+
+      {/* Pending Members Banner */}
+      {pendingCount > 0 && (
+        <div
+          className="flex items-center justify-between gap-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl px-5 py-4 cursor-pointer hover:bg-amber-500/15 transition-colors"
+          onClick={() => setStatusFilter('En attente')}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+              <Bell size={20} className="text-amber-500 animate-pulse" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-amber-700 dark:text-amber-400">
+                {pendingCount} compte{pendingCount > 1 ? 's' : ''} en attente de validation
+              </p>
+              <p className="text-xs text-amber-600/70 dark:text-amber-500/70 font-medium">
+                Cliquez pour afficher et valider les nouvelles inscriptions
+              </p>
+            </div>
+          </div>
+          <span className="shrink-0 inline-flex items-center gap-1.5 bg-amber-500 text-white text-xs font-extrabold px-3 py-1.5 rounded-xl shadow">
+            <UserCheck size={14} />
+            Voir
+          </span>
+        </div>
+      )}
 
       {/* --- Add/Edit Member Modal --- */}
       {isModalOpen && (
@@ -664,7 +723,21 @@ const Members = () => {
               className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/50 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none text-foreground placeholder:text-muted-foreground transition-all shadow-sm"
             />
           </div>
-          <div className="flex space-x-3 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className={`text-sm font-medium rounded-xl px-4 py-2.5 border outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary flex-none shadow-sm transition-all cursor-pointer ${
+                statusFilter === 'En attente'
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/40 font-bold'
+                  : 'bg-background text-foreground border-border/50'
+              }`}
+            >
+              <option value="Tous les statuts">Tous les statuts</option>
+              <option value="En attente">⏳ En attente</option>
+              <option value="Actif">✅ Actif</option>
+              <option value="Inactif">❌ Inactif</option>
+            </select>
             <select 
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
@@ -782,9 +855,14 @@ const Members = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
-                        member.status === 'Actif' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400' : 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400'
+                        member.status === 'Actif'
+                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400'
+                          : member.status === 'En attente'
+                          ? 'bg-amber-500/10 text-amber-700 border-amber-500/30 dark:text-amber-400'
+                          : 'bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400'
                       }`}>
                         {member.status === 'Actif' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>}
+                        {member.status === 'En attente' && <Clock size={11} className="mr-1.5 animate-pulse" />}
                         {member.status === 'Inactif' && <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>}
                         {member.status}
                       </span>
@@ -799,20 +877,30 @@ const Members = () => {
                       
                       {/* Dropdown Menu */}
                       {activeDropdown === member.id && (
-                        <div className="absolute right-6 top-10 w-48 bg-card border border-border/50 rounded-xl shadow-xl z-10 py-1.5 overflow-hidden backdrop-blur-xl">
+                        <div className="absolute right-6 top-10 w-52 bg-card border border-border/50 rounded-xl shadow-xl z-10 py-1.5 overflow-hidden backdrop-blur-xl">
+                          {member.status === 'En attente' && (
+                            <button 
+                              className="w-full text-left px-4 py-2 text-sm font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 flex items-center transition-colors"
+                              onClick={() => handleValidatePending(member.id)}
+                            >
+                              <UserCheck size={14} className="mr-2.5 text-amber-500" /> Valider le compte
+                            </button>
+                          )}
                           <button 
                             className="w-full text-left px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 flex items-center transition-colors"
                             onClick={() => handleOpenEditModal(member)}
                           >
                             <Edit size={14} className="mr-2.5 text-muted-foreground" /> Modifier
                           </button>
-                          <button 
-                            className="w-full text-left px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 flex items-center transition-colors"
-                            onClick={() => handleToggleStatus(member.id, member.status)}
-                          >
-                            <Power size={14} className={`mr-2.5 ${member.status === 'Actif' ? 'text-red-500' : 'text-emerald-500'}`} />
-                            {member.status === 'Actif' ? 'Désactiver' : 'Activer'}
-                          </button>
+                          {member.status !== 'En attente' && (
+                            <button 
+                              className="w-full text-left px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 flex items-center transition-colors"
+                              onClick={() => handleToggleStatus(member.id, member.status)}
+                            >
+                              <Power size={14} className={`mr-2.5 ${member.status === 'Actif' ? 'text-red-500' : 'text-emerald-500'}`} />
+                              {member.status === 'Actif' ? 'Désactiver' : 'Activer'}
+                            </button>
+                          )}
                           <button 
                             className="w-full text-left px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary/80 flex items-center transition-colors"
                             onClick={() => {

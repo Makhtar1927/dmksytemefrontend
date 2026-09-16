@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Send, MessageSquare, AlertTriangle, Loader2, Bell } from 'lucide-react';
+import { Send, MessageSquare, AlertTriangle, Loader2, Bell, Flame } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { logActivity } from '../utils/logger';
@@ -33,6 +33,37 @@ const Communication = () => {
   const [triggerEvent, setTriggerEvent] = useState(() => {
     return localStorage.getItem('trigger_rappel_event') !== 'false';
   });
+
+  const [testPushLoading, setTestPushLoading] = useState(false);
+  const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
+
+  const handleFireTestPush = async () => {
+    try {
+      setTestPushLoading(true);
+      setTestPushStatus(null);
+      const baseUrl = getApiUrl();
+      const res = await fetch(`${baseUrl}/api/notifications/test-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '🔥 Test Push DMK',
+          body: 'Test de notification push en direct vers tous les appareils connectés !'
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        const fcmCount = data.summary?.fcm?.success || 0;
+        const webCount = data.summary?.webPush?.success || 0;
+        setTestPushStatus(`✅ Push envoyé ! (${fcmCount} mobile FCM, ${webCount} web PWA). Résumé : ${data.summary?.fcm?.tokensCount || 0} tokens mobile, ${data.summary?.webPush?.subscriptionsCount || 0} abonnés web.`);
+      } else {
+        setTestPushStatus(`⚠️ Info serveur : ${data.message || 'Erreur inconnue'}`);
+      }
+    } catch (err: any) {
+      setTestPushStatus(`❌ Erreur connexion serveur : ${err.message}`);
+    } finally {
+      setTestPushLoading(false);
+    }
+  };
 
   const toggleTriggerSass = () => {
     const nextVal = !triggerSass;
@@ -458,19 +489,37 @@ const Communication = () => {
               ></textarea>
             </div>
 
+            {testPushStatus && (
+              <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl text-xs font-semibold flex items-center">
+                {testPushStatus}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-6 border-t border-border/50 mt-6 gap-4 sm:gap-0">
               <div className="flex items-center space-x-3 bg-secondary/50 px-3 py-2.5 rounded-xl border border-border/50">
                 <input type="checkbox" id="auto-delete" className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer" defaultChecked />
                 <label htmlFor="auto-delete" className="text-sm font-medium text-foreground cursor-pointer">Notification prioritaire</label>
               </div>
-              <button 
-                type="submit" 
-                disabled={loading}
-                className="w-full sm:w-auto bg-gradient-to-r from-primary to-indigo-600 text-primary-foreground font-semibold px-6 py-3 rounded-xl flex justify-center items-center shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
-              >
-                {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : <Send size={18} className="mr-2" />}
-                Diffuser l'alerte
-              </button>
+              <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleFireTestPush}
+                  disabled={testPushLoading}
+                  className="w-full sm:w-auto bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold px-4 py-3 rounded-xl flex justify-center items-center border border-amber-500/30 transition-all cursor-pointer disabled:opacity-50"
+                  title="Envoyer un push test instantané à tous les appareils connectés"
+                >
+                  {testPushLoading ? <Loader2 size={16} className="animate-spin mr-2" /> : <Flame size={16} className="mr-2" />}
+                  Fire Push Test 🔥
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full sm:w-auto bg-gradient-to-r from-primary to-indigo-600 text-primary-foreground font-semibold px-6 py-3 rounded-xl flex justify-center items-center shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:hover:translate-y-0"
+                >
+                  {loading ? <Loader2 size={18} className="animate-spin mr-2" /> : <Send size={18} className="mr-2" />}
+                  Diffuser l'alerte
+                </button>
+              </div>
             </div>
           </form>
         </div>
