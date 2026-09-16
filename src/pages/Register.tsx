@@ -129,6 +129,7 @@ const Register = () => {
 
         if (existingMember) {
           setError(`Cette adresse email (${cleanEmail}) est déjà enregistrée. Veuillez vous connecter.`);
+          setLoading(false);
           return;
         }
 
@@ -166,6 +167,7 @@ const Register = () => {
 
             if (existingInDb) {
               setError(`Cette adresse email (${cleanEmail}) est déjà enregistrée. Veuillez vous connecter.`);
+              setLoading(false);
               return;
             }
 
@@ -200,6 +202,7 @@ const Register = () => {
             }]);
 
             if (!recoveryDbErr) {
+              setLoading(false);
               setSuccessData({ dmk_id: generatedDmkId });
               return;
             } else {
@@ -239,6 +242,7 @@ const Register = () => {
 
         if (dbErr) throw dbErr;
 
+        setLoading(false);
         setSuccessData({ dmk_id: generatedDmkId });
 
       } catch (fallbackErr: unknown) {
