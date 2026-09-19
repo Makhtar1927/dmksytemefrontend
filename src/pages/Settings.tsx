@@ -1772,50 +1772,68 @@ const Settings = () => {
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 relative z-10">
                   {/* Carte 1 : Base Membres (CSV / Excel) */}
-                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                  <div className="border border-border/50 rounded-2xl p-5 bg-background hover:bg-secondary/20 transition-all group flex flex-col justify-between shadow-sm">
                     <div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
-                          <Database size={24} />
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="p-2.5 bg-green-500/10 rounded-xl text-green-600 dark:text-green-400">
+                          <Database size={22} />
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-600 dark:text-green-400 px-2.5 py-1 rounded-full border border-green-500/20">
                           Excel & Tableur
                         </span>
                       </div>
-                      <h3 className="font-bold text-foreground mb-1">Base Membres (Excel / CSV)</h3>
-                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">Export brut exhaustif de l'annuaire (ID DMK, CNI, contacts, secteurs et cotisations Sass) encodé en UTF-8 avec BOM pour une ouverture parfaite dans Excel.</p>
+                      <h3 className="font-bold text-foreground text-base mb-1.5">Base Membres (Excel / CSV)</h3>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed min-h-[48px]">Export brut exhaustif de l'annuaire (ID DMK, CNI, contacts, secteurs et cotisations Sass) encodé en UTF-8 avec BOM pour Excel.</p>
+                      
+                      <div className="mb-5 bg-secondary/30 p-3 rounded-xl border border-border/40 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Format d'export :</label>
+                          <div className="w-full bg-background text-foreground text-xs font-medium px-3 py-2 rounded-lg border border-border/60 flex items-center justify-between shadow-sm">
+                            <span className="font-semibold">Fichier .CSV (BOM UTF-8)</span>
+                            <span className="text-[10px] bg-green-500/10 text-green-600 font-bold px-1.5 py-0.5 rounded">Excel Prêt</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Séparateur natif :</label>
+                          <div className="w-full bg-background text-foreground text-xs font-medium px-3 py-2 rounded-lg border border-border/60 flex items-center justify-between shadow-sm">
+                            <span className="text-muted-foreground">Point-virgule (;)</span>
+                            <span className="text-[10px] text-muted-foreground">FR Windows</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
                     <button 
                       onClick={exportMembersToCSV}
                       disabled={isExporting}
-                      className="w-full bg-secondary text-foreground hover:bg-green-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
+                      className="w-full bg-secondary text-foreground hover:bg-green-600 hover:text-white border border-border/50 hover:border-transparent font-semibold px-4 py-2.5 rounded-xl transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-xs group-hover:border-green-500/30"
                     >
-                      {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <Download size={18} className="mr-2" />}
+                      {isExporting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Download size={16} className="mr-2" />}
                       Générer le .CSV (Excel)
                     </button>
                   </div>
 
                   {/* Carte 2 : Annuaire Membres (PDF A4) */}
-                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                  <div className="border border-border/50 rounded-2xl p-5 bg-background hover:bg-secondary/20 transition-all group flex flex-col justify-between shadow-sm">
                     <div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400">
-                          <Users size={24} />
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400">
+                          <Users size={22} />
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20">
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2.5 py-1 rounded-full border border-blue-500/20">
                           Impression A4
                         </span>
                       </div>
-                      <h3 className="font-bold text-foreground mb-1">Annuaire Membres (PDF A4)</h3>
-                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">Document A4 officiel : démographie, graphique sectoriel et listes groupées par secteur ou feuille de présence.</p>
+                      <h3 className="font-bold text-foreground text-base mb-1.5">Annuaire Membres (PDF A4)</h3>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed min-h-[48px]">Document A4 officiel : démographie, graphique sectoriel et listes groupées par secteur ou feuille de présence.</p>
                       
-                      <div className="space-y-2 mb-4 bg-secondary/20 p-2.5 rounded-lg border border-border/40">
-                        <div className="flex items-center justify-between text-xs">
-                          <label className="font-semibold text-muted-foreground">Secteur :</label>
+                      <div className="mb-5 bg-secondary/30 p-3 rounded-xl border border-border/40 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Secteur :</label>
                           <select
                             value={memberSectorFilter}
                             onChange={(e) => setMemberSectorFilter(e.target.value)}
-                            className="bg-background text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[150px]"
+                            className="w-full bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg border border-border/60 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all shadow-sm"
                           >
                             <option value="all">Tous les secteurs</option>
                             {availableSectors.map(s => (
@@ -1823,59 +1841,74 @@ const Settings = () => {
                             ))}
                           </select>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <label className="font-semibold text-muted-foreground">Format :</label>
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Format du document :</label>
                           <select
                             value={memberReportType}
                             onChange={(e) => setMemberReportType(e.target.value as 'directory' | 'attendance')}
-                            className="bg-background text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                            className="w-full bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg border border-border/60 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 cursor-pointer transition-all shadow-sm"
                           >
                             <option value="directory">Annuaire Officiel</option>
-                            <option value="attendance">Feuille d'Émargement</option>
+                            <option value="attendance">Feuille d'Émargement (Présence)</option>
                           </select>
                         </div>
                       </div>
                     </div>
+
                     <button 
                       onClick={exportMembersToPDF}
                       disabled={isExporting}
-                      className="w-full bg-secondary text-foreground hover:bg-blue-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
+                      className="w-full bg-secondary text-foreground hover:bg-blue-600 hover:text-white border border-border/50 hover:border-transparent font-semibold px-4 py-2.5 rounded-xl transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-xs group-hover:border-blue-500/30"
                     >
-                      {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
+                      {isExporting ? <Loader2 size={16} className="animate-spin mr-2" /> : <FileText size={16} className="mr-2" />}
                       Imprimer l'Annuaire (A4)
                     </button>
                   </div>
 
                   {/* Carte 3 : Rapport Financier (PDF A4) */}
-                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                  <div className="border border-border/50 rounded-2xl p-5 bg-background hover:bg-secondary/20 transition-all group flex flex-col justify-between shadow-sm">
                     <div>
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="p-2 bg-red-500/10 rounded-lg text-red-600 dark:text-red-400">
-                          <FileText size={24} />
+                      <div className="flex justify-between items-center mb-4">
+                        <div className="p-2.5 bg-red-500/10 rounded-xl text-red-600 dark:text-red-400">
+                          <FileText size={22} />
                         </div>
-                        <div className="flex items-center space-x-1.5">
-                          <label className="text-[10px] font-semibold text-muted-foreground uppercase">Exercice :</label>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-red-500/10 text-red-600 dark:text-red-400 px-2.5 py-1 rounded-full border border-red-500/20">
+                          Bilan Financier
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-foreground text-base mb-1.5">Rapport Financier (PDF A4)</h3>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed min-h-[48px]">Bilan officiel format A4 : agrégation hebdomadaire (vendredis 23h59), statistiques sectorielles et décaissements.</p>
+                      
+                      <div className="mb-5 bg-secondary/30 p-3 rounded-xl border border-border/40 space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Exercice fiscal :</label>
                           <select
                             value={reportYear}
                             onChange={(e) => setReportYear(e.target.value)}
-                            className="bg-secondary text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                            className="w-full bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg border border-border/60 outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 cursor-pointer transition-all shadow-sm"
                           >
                             <option value={currentYear.toString()}>{currentYear} (En cours)</option>
                             <option value={(currentYear - 1).toString()}>{currentYear - 1}</option>
                             <option value={(currentYear - 2).toString()}>{currentYear - 2}</option>
-                            <option value="all">Tout l'historique</option>
+                            <option value="all">Tout l'historique consolidé</option>
                           </select>
                         </div>
+                        <div className="space-y-1.5">
+                          <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Agrégation des flux :</label>
+                          <div className="w-full bg-background text-foreground text-xs font-medium px-3 py-2 rounded-lg border border-border/60 flex items-center justify-between shadow-sm">
+                            <span>Clôture hebdomadaire (Vendredi)</span>
+                            <span className="text-[10px] bg-red-500/10 text-red-600 font-bold px-1.5 py-0.5 rounded">23h59</span>
+                          </div>
+                        </div>
                       </div>
-                      <h3 className="font-bold text-foreground mb-1">Rapport Financier (PDF A4)</h3>
-                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">Bilan officiel format A4 : agrégation hebdomadaire (vendredis 23h59m59s), statistiques sectorielles, graphiques & décaissements.</p>
                     </div>
+
                     <button 
                       onClick={exportFinancialReportPDF}
                       disabled={isExporting}
-                      className="w-full bg-secondary text-foreground hover:bg-red-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
+                      className="w-full bg-secondary text-foreground hover:bg-red-600 hover:text-white border border-border/50 hover:border-transparent font-semibold px-4 py-2.5 rounded-xl transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-xs group-hover:border-red-500/30"
                     >
-                      {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
+                      {isExporting ? <Loader2 size={16} className="animate-spin mr-2" /> : <FileText size={16} className="mr-2" />}
                       Imprimer le Bilan (A4)
                     </button>
                   </div>
