@@ -61,6 +61,34 @@ const Settings = () => {
   const [isResetting, setIsResetting] = useState(false);
   const currentYear = new Date().getFullYear();
   const [reportYear, setReportYear] = useState<string>(currentYear.toString());
+  const [memberSectorFilter, setMemberSectorFilter] = useState<string>('all');
+  const [memberReportType, setMemberReportType] = useState<'directory' | 'attendance'>('directory');
+  const [availableSectors, setAvailableSectors] = useState<string[]>([
+    "Vaisselle", "Café", "Restauration", "Organisation", "Sonorisation",
+    "Visuelle", "Bétail", "Cuisine", "Eau & Hygiène", "Protocole",
+    "Decoration", "Culturelle", "Conservatoire", "Campagne", "Jayanté Kat yi",
+    "Nouveau"
+  ]);
+
+  useEffect(() => {
+    const fetchSectors = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('members')
+          .select('sector')
+          .not('sector', 'is', null);
+        if (!error && data) {
+          const fetched = Array.from(new Set(data.map(d => d.sector?.trim()).filter(Boolean) as string[])).sort();
+          if (fetched.length > 0) {
+            setAvailableSectors(fetched);
+          }
+        }
+      } catch {
+        // Garder la liste par défaut
+      }
+    };
+    fetchSectors();
+  }, []);
 
   // Modal State Data Reset
   const [showResetModal, setShowResetModal] = useState(false);
@@ -130,7 +158,7 @@ const Settings = () => {
     }
   };
 
-  // Export Members to CSV
+  // Export Members to CSV (Optimisé Excel Windows UTF-8 avec BOM)
   const exportMembersToCSV = async () => {
     setIsExporting(true);
     try {
@@ -165,32 +193,32 @@ const Settings = () => {
       const data = allMembers;
 
       const headers = [
-        'dmk_id',
-        'first_name',
-        'last_name',
-        'email',
-        'phone',
-        'role',
-        'sector',
-        'status',
-        'birth_date',
-        'birth_place',
-        'address',
-        'cni_number',
-        'cni_issue_date',
-        'cni_expiry_date',
-        'blood_type',
-        'gender',
-        'join_date',
-        'profession',
-        'sass_magal',
-        'sass_ziaar',
-        'sass_kst',
-        'sass_cahier',
-        'sass_projets',
-        'sass_autres',
-        'marital_status',
-        'created_at'
+        'ID DMK',
+        'Prénom',
+        'Nom',
+        'Email',
+        'Téléphone',
+        'Rôle',
+        'Secteur',
+        'Statut',
+        'Date de naissance',
+        'Lieu de naissance',
+        'Adresse',
+        'Numéro CNI',
+        'Date émission CNI',
+        'Date expiration CNI',
+        'Groupe sanguin',
+        'Genre',
+        'Date adhésion',
+        'Profession',
+        'Sass Magal',
+        'Sass Ziaar',
+        'Sass KST',
+        'Sass Cahier',
+        'Sass Projets',
+        'Sass Autres',
+        'Situation matrimoniale',
+        'Date création'
       ];
 
       const escapeCSV = (val: unknown) => {
@@ -199,8 +227,9 @@ const Settings = () => {
         return `"${str.replace(/"/g, '""')}"`;
       };
 
-      const csvContent = [
-        headers.join(','),
+      // Ajout de \uFEFF pour l'encodage UTF-8 reconnu automatiquement par Microsoft Excel
+      const csvContent = '\uFEFF' + [
+        headers.join(';'),
         ...data.map(m => [
           escapeCSV(m.dmk_id),
           escapeCSV(m.first_name),
@@ -228,8 +257,8 @@ const Settings = () => {
           escapeCSV(m.sass_autres !== undefined && m.sass_autres !== null ? m.sass_autres : 0),
           escapeCSV(m.marital_status),
           escapeCSV(m.created_at ? format(new Date(m.created_at), 'yyyy-MM-dd') : '')
-        ].join(','))
-      ].join('\n');
+        ].join(';'))
+      ].join('\r\n');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -242,6 +271,513 @@ const Settings = () => {
       
     } catch (err) {
       alert("Erreur lors de l'export: " + (err as Error).message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Export Members Directory to PDF (A4 Print Engine)
+  const exportMembersToPDF = async () => {
+    setIsExporting(true);
+    try {
+      let allMembers: Member[] = [];
+      let from = 0;
+      let hasMore = true;
+
+      // Récupération exhaustive avec pagination pour contourner la limite Supabase de 1000 lignes
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('members')
+          .select('*')
+          .order('sector', { ascending: true })
+          .order('last_name', { ascending: true })
+          .range(from, from + 999);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allMembers = [...allMembers, ...data as Member[]];
+          from += 1000;
+          if (data.length < 1000) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (allMembers.length === 0) {
+        alert("Aucun membre trouvé dans la base de données.");
+        return;
+      }
+
+      // Filtrage par secteur si sélectionné
+      let filteredMembers = allMembers;
+      if (memberSectorFilter !== 'all') {
+        filteredMembers = filteredMembers.filter(m => (m.sector || '').trim().toLowerCase() === memberSectorFilter.trim().toLowerCase());
+      }
+
+      if (filteredMembers.length === 0) {
+        alert(`Aucun membre trouvé pour le secteur "${memberSectorFilter}".`);
+        return;
+      }
+
+      // Tri alphabétique par nom et prénom
+      filteredMembers.sort((a, b) => {
+        const sectA = a.sector?.trim() || 'Non attribué';
+        const sectB = b.sector?.trim() || 'Non attribué';
+        if (sectA !== sectB) return sectA.localeCompare(sectB, 'fr');
+        const nameA = `${a.last_name || ''} ${a.first_name || ''}`.trim();
+        const nameB = `${b.last_name || ''} ${b.first_name || ''}`.trim();
+        return nameA.localeCompare(nameB, 'fr');
+      });
+
+      // Métriques Globales
+      const totalCount = filteredMembers.length;
+      const menCount = filteredMembers.filter(m => /^(homme|masculin|m)$/i.test(m.gender?.trim() || '')).length;
+      const womenCount = filteredMembers.filter(m => /^(femme|f[ée]minin|f)$/i.test(m.gender?.trim() || '')).length;
+      const activeCount = filteredMembers.filter(m => !m.status || /^(actif|valid[ée])$/i.test(m.status.trim())).length;
+      
+      // Regroupement par secteur
+      const groupedBySector: { [sector: string]: Member[] } = {};
+      filteredMembers.forEach(m => {
+        const s = m.sector?.trim() || 'Non attribué';
+        if (!groupedBySector[s]) groupedBySector[s] = [];
+        groupedBySector[s].push(m);
+      });
+
+      const sectorKeys = Object.keys(groupedBySector).sort((a, b) => {
+        if (a === 'Non attribué') return 1;
+        if (b === 'Non attribué') return -1;
+        return a.localeCompare(b, 'fr');
+      });
+
+      const distinctSectorsCount = sectorKeys.length;
+
+      // Histogramme vectoriel SVG de répartition sectorielle (si multi-secteurs)
+      const sectorStats = sectorKeys.map(name => ({
+        name,
+        count: groupedBySector[name].length,
+        percentage: (groupedBySector[name].length / totalCount) * 100
+      })).sort((a, b) => b.count - a.count);
+
+      const maxSectorCount = sectorStats[0]?.count || 1;
+      const barChartRows = sectorStats.slice(0, 10).map((s, idx) => {
+        const barWidth = Math.max(4, Math.round((s.count / maxSectorCount) * 220));
+        const yPos = idx * 18 + 8;
+        return `
+          <g>
+            <text x="110" y="${yPos + 9}" text-anchor="end" font-size="8.5" font-weight="700" fill="#334155">${s.name.length > 18 ? s.name.slice(0, 17) + '…' : s.name}</text>
+            <rect x="120" y="${yPos}" width="${barWidth}" height="11" rx="2" fill="#1e40af" opacity="0.85" />
+            <text x="${126 + barWidth}" y="${yPos + 9}" font-size="8" font-weight="700" fill="#0f172a">${s.count} (${s.percentage.toFixed(0)}%)</text>
+          </g>
+        `;
+      }).join('');
+      const barChartSvgHeight = Math.max(90, sectorStats.slice(0, 10).length * 18 + 16);
+
+      const isAttendance = memberReportType === 'attendance';
+      const docTitle = isAttendance ? "Feuille d'Émargement & Contrôle de Présence" : "Répertoire & Annuaire Officiel des Membres";
+      const scopeLabel = memberSectorFilter === 'all' 
+        ? `Consolidé Général (${distinctSectorsCount} Secteurs • ${totalCount} Membres)` 
+        : `Secteur : ${memberSectorFilter} (${totalCount} Membre${totalCount > 1 ? 's' : ''})`;
+
+      // Construction du Document HTML A4 Professionnel
+      const html = `
+        <!DOCTYPE html>
+        <html lang="fr">
+          <head>
+            <meta charset="UTF-8" />
+            <title>${docTitle} - Daara Mawahiboul Khoudoss</title>
+            <style>
+              @page {
+                size: A4 portrait;
+                margin: 10mm 12mm 12mm 12mm;
+              }
+              * {
+                box-sizing: border-box;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+              }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                margin: 0;
+                padding: 0;
+                color: #0f172a;
+                background-color: #ffffff;
+                font-size: 9.5px;
+                line-height: 1.35;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
+              }
+              .avoid-break {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
+              /* Header */
+              .header-table {
+                width: 100%;
+                border-bottom: 2.5px solid #1e3a8a;
+                padding-bottom: 8px;
+                margin-bottom: 12px;
+              }
+              .org-name {
+                font-size: 17px;
+                font-weight: 900;
+                color: #1e3a8a;
+                letter-spacing: -0.3px;
+                margin: 0;
+                text-transform: uppercase;
+              }
+              .org-sub {
+                font-size: 9.5px;
+                font-weight: 700;
+                color: #475569;
+                margin: 2px 0 0 0;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+              }
+              .meta-box {
+                text-align: right;
+                font-size: 9px;
+                color: #475569;
+                line-height: 1.35;
+              }
+              .report-banner {
+                background: linear-gradient(135deg, #1e3a8a 0%, #0369a1 100%);
+                color: white;
+                padding: 9px 14px;
+                border-radius: 8px;
+                margin-bottom: 12px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              }
+              .report-title {
+                font-size: 14px;
+                font-weight: 800;
+                text-transform: uppercase;
+                margin: 0;
+                letter-spacing: 0.4px;
+              }
+              .report-badge {
+                background-color: rgba(255, 255, 255, 0.2);
+                padding: 4px 10px;
+                border-radius: 20px;
+                font-size: 9.5px;
+                font-weight: 700;
+              }
+              /* KPIs */
+              .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 8px;
+                margin-bottom: 12px;
+              }
+              .kpi-card {
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 8px 10px;
+                background-color: #f8fafc;
+              }
+              .kpi-label {
+                font-size: 8px;
+                font-weight: 700;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 2px;
+              }
+              .kpi-value {
+                font-size: 14px;
+                font-weight: 900;
+                color: #1e3a8a;
+                margin: 0;
+              }
+              /* Tables */
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 12px;
+                font-size: 9px;
+              }
+              thead {
+                display: table-header-group;
+              }
+              tr {
+                page-break-inside: avoid;
+              }
+              th {
+                background-color: #f1f5f9;
+                color: #1e293b;
+                font-weight: 800;
+                text-align: left;
+                padding: 5px 6px;
+                border-bottom: 1.5px solid #cbd5e1;
+                border-top: 1px solid #cbd5e1;
+                font-size: 8.5px;
+                text-transform: uppercase;
+              }
+              td {
+                padding: 4.5px 6px;
+                border-bottom: 1px solid #e2e8f0;
+                color: #334155;
+              }
+              tr:nth-child(even) td {
+                background-color: #f8fafc;
+              }
+              .sector-header-row {
+                background: #e0e7ff !important;
+                color: #1e3a8a;
+                font-weight: 800;
+                font-size: 9.5px;
+                padding: 6px 8px;
+                border-top: 2px solid #3b82f6;
+                border-bottom: 1.5px solid #93c5fd;
+              }
+              .text-right { text-align: right; }
+              .text-center { text-align: center; }
+              .font-bold { font-weight: 700; }
+              .font-black { font-weight: 900; }
+              .badge-status {
+                display: inline-block;
+                padding: 1px 6px;
+                border-radius: 4px;
+                font-size: 8px;
+                font-weight: 700;
+                background-color: #dcfce7;
+                color: #15803d;
+              }
+              .attendance-box {
+                display: inline-block;
+                width: 14px;
+                height: 14px;
+                border: 1.5px solid #64748b;
+                border-radius: 2px;
+                vertical-align: middle;
+              }
+              .signature-cell {
+                height: 26px;
+                border-bottom: 1px dashed #cbd5e1 !important;
+              }
+              /* Signatures Frame */
+              .signature-container {
+                margin-top: 16px;
+                padding: 10px;
+                border: 1.5px dashed #cbd5e1;
+                border-radius: 8px;
+                background-color: #fafafa;
+                page-break-inside: avoid;
+              }
+              .signature-header {
+                text-align: center;
+                font-size: 9.5px;
+                font-weight: 800;
+                color: #1e3a8a;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                margin-bottom: 10px;
+              }
+              .signature-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+              }
+              .signature-box {
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 8px;
+                background-color: #ffffff;
+                text-align: center;
+                height: 95px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+              }
+              .signature-role {
+                font-size: 9.5px;
+                font-weight: 800;
+                color: #0f172a;
+                text-transform: uppercase;
+              }
+              .signature-sub {
+                font-size: 7.5px;
+                color: #64748b;
+                font-style: italic;
+              }
+              .signature-line {
+                border-top: 1px dashed #94a3b8;
+                padding-top: 3px;
+                font-size: 7.5px;
+                color: #94a3b8;
+              }
+              /* Footer */
+              .doc-footer {
+                margin-top: 12px;
+                border-top: 1px solid #e2e8f0;
+                padding-top: 6px;
+                text-align: center;
+                font-size: 8px;
+                color: #94a3b8;
+              }
+            </style>
+          </head>
+          <body>
+
+            <!-- En-Tête Officiel -->
+            <table class="header-table">
+              <tr>
+                <td style="border: none; padding: 0;">
+                  <h1 class="org-name">Daara Mawahiboul Khoudoss</h1>
+                  <p class="org-sub">Secrétariat Général • Commission d'Organisation • Gestion des Membres</p>
+                </td>
+                <td style="border: none; padding: 0;" class="meta-box">
+                  <div><strong>Date d'émission :</strong> ${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
+                  <div><strong>Document :</strong> ${isAttendance ? "Feuille d'Émargement & Présence" : "Annuaire Officiel des Adhérents"}</div>
+                  <div><strong>Réf :</strong> DMK-MEM-${format(new Date(), 'yyyyMMdd-HHmm')}</div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Bannière du Titre -->
+            <div class="report-banner">
+              <div>
+                <h2 class="report-title">${docTitle}</h2>
+                <div style="font-size: 9px; opacity: 0.9; margin-top: 2px;">${scopeLabel}</div>
+              </div>
+              <div class="report-badge">${totalCount} Membre${totalCount > 1 ? 's' : ''}</div>
+            </div>
+
+            <!-- Synthèse Chiffrée (KPIs) -->
+            <div class="kpi-grid">
+              <div class="kpi-card">
+                <div class="kpi-label">Effectif Total</div>
+                <div class="kpi-value">${totalCount}</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Hommes</div>
+                <div class="kpi-value" style="color: #0369a1;">${menCount} <span style="font-size: 9px; font-weight: normal; color: #64748b;">(${totalCount > 0 ? Math.round((menCount / totalCount) * 100) : 0}%)</span></div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">Femmes</div>
+                <div class="kpi-value" style="color: #be185d;">${womenCount} <span style="font-size: 9px; font-weight: normal; color: #64748b;">(${totalCount > 0 ? Math.round((womenCount / totalCount) * 100) : 0}%)</span></div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">${memberSectorFilter === 'all' ? 'Secteurs Actifs' : 'Statut Actif'}</div>
+                <div class="kpi-value" style="color: #15803d;">${memberSectorFilter === 'all' ? distinctSectorsCount : activeCount}</div>
+              </div>
+            </div>
+
+            ${memberSectorFilter === 'all' && sectorStats.length > 1 ? `
+              <!-- Répartition Démographique par Secteur (SVG) -->
+              <div class="avoid-break" style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; background: #ffffff;">
+                <div style="font-size: 9px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #f1f5f9; padding-bottom: 3px;">
+                  Répartition des Effectifs par Secteur (Top ${Math.min(10, sectorStats.length)})
+                </div>
+                <svg width="100%" height="${barChartSvgHeight}" viewBox="0 0 450 ${barChartSvgHeight}">
+                  ${barChartRows}
+                </svg>
+              </div>
+            ` : ''}
+
+            <!-- Tableau Détaillé de l'Annuaire (Groupé par Secteur) -->
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 25px;" class="text-center">N°</th>
+                  <th style="width: 75px;">ID DMK</th>
+                  <th style="width: 170px;">Prénom & Nom</th>
+                  <th style="width: 90px;">Téléphone</th>
+                  <th style="width: 100px;">Secteur</th>
+                  ${isAttendance ? `
+                    <th style="width: 60px;" class="text-center">Présent</th>
+                    <th style="width: 160px;" class="text-center">Émargement / Signature</th>
+                  ` : `
+                    <th style="width: 90px;">Rôle</th>
+                    <th style="width: 65px;" class="text-center">Statut</th>
+                    <th style="width: 100px;">Profession</th>
+                  `}
+                </tr>
+              </thead>
+              <tbody>
+                ${sectorKeys.map(sectorName => {
+                  const sectorMembers = groupedBySector[sectorName];
+                  return `
+                    <tr>
+                      <td colspan="${isAttendance ? 7 : 8}" class="sector-header-row">
+                        📁 SECTEUR : ${sectorName.toUpperCase()} — ${sectorMembers.length} MEMBRE${sectorMembers.length > 1 ? 'S' : ''}
+                      </td>
+                    </tr>
+                    ${sectorMembers.map((m, idx) => `
+                      <tr>
+                        <td class="text-center font-bold" style="color: #64748b;">${idx + 1}</td>
+                        <td class="font-bold" style="color: #1e40af; font-family: monospace;">${m.dmk_id || '-'}</td>
+                        <td class="font-bold">${m.first_name || ''} ${m.last_name || ''}</td>
+                        <td style="white-space: nowrap;">${m.phone || '-'}</td>
+                        <td>${m.sector || 'Non attribué'}</td>
+                        ${isAttendance ? `
+                          <td class="text-center"><span class="attendance-box"></span></td>
+                          <td class="signature-cell"></td>
+                        ` : `
+                          <td>${m.role || 'Membre Simple'}</td>
+                          <td class="text-center">
+                            <span class="badge-status">${m.status || 'Actif'}</span>
+                          </td>
+                          <td>${m.profession || '-'}</td>
+                        `}
+                      </tr>
+                    `).join('')}
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+
+            <!-- SECTION Approbation & Signatures -->
+            <div class="signature-container avoid-break">
+              <div class="signature-header">Visa & Certification Officielle du Document</div>
+              <div class="signature-grid">
+                <div class="signature-box">
+                  <div>
+                    <div class="signature-role">Le Secrétaire Général</div>
+                    <div class="signature-sub">Daara Mawahiboul Khoudoss</div>
+                  </div>
+                  <div class="signature-line">Date, Signature & Cachet</div>
+                </div>
+
+                <div class="signature-box">
+                  <div>
+                    <div class="signature-role">La Commission d'Organisation</div>
+                    <div class="signature-sub">Responsable des Adhérents & Dahiras</div>
+                  </div>
+                  <div class="signature-line">Date, Signature & Cachet</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pied de Page Document -->
+            <div class="doc-footer avoid-break">
+              Document officiel généré par le Système d'Information de la Daara Mawahiboul Khoudoss.
+              <br/>Imprimé le ${format(new Date(), 'dd/MM/yyyy à HH:mm')} • Document certifié conforme pour les archives et réunions officielles.
+            </div>
+
+            <script>
+              window.onload = () => {
+                window.print();
+              };
+            </script>
+          </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+      } else {
+        alert("Veuillez autoriser les fenêtres pop-up dans votre navigateur pour imprimer l'annuaire.");
+      }
+
+    } catch (err) {
+      alert("Erreur lors de la génération du document: " + (err as Error).message);
     } finally {
       setIsExporting(false);
     }
@@ -341,7 +877,7 @@ const Settings = () => {
         // Un vendredi ne peut jamais «dépasser» 23h59m59s, donc aucune condition horaire
         // particulière n'est nécessaire pour le vendredi lui-même.
         // Un versement du samedi (day === 6) est reporté au vendredi suivant (+6 jours).
-        let daysToAdd = (5 - day + 7) % 7;
+        const daysToAdd = (5 - day + 7) % 7;
         // day === 5 → daysToAdd = 0 (vendredi courant, inclus jusqu'à 23h59m59s)
         // day === 6 → daysToAdd = 6 (samedi, reporté au vendredi suivant)
 
@@ -519,7 +1055,7 @@ const Settings = () => {
         : `Exercice Fiscal ${reportYear}`;
 
       // 4. Construction du Document HTML Format A4 Professionnel
-      let html = `
+      const html = `
         <!DOCTYPE html>
         <html lang="fr">
           <head>
@@ -1234,53 +1770,113 @@ const Settings = () => {
                   Exports de Données
                 </h2>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
-                        <Database size={24} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 relative z-10">
+                  {/* Carte 1 : Base Membres (CSV / Excel) */}
+                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="p-2 bg-green-500/10 rounded-lg text-green-600 dark:text-green-400">
+                          <Database size={24} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-green-500/10 text-green-600 dark:text-green-400 px-2 py-0.5 rounded-full border border-green-500/20">
+                          Excel & Tableur
+                        </span>
                       </div>
+                      <h3 className="font-bold text-foreground mb-1">Base Membres (Excel / CSV)</h3>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">Export brut exhaustif de l'annuaire (ID DMK, CNI, contacts, secteurs et cotisations Sass) encodé en UTF-8 avec BOM pour une ouverture parfaite dans Excel.</p>
                     </div>
-                    <h3 className="font-bold text-foreground mb-1">Base Membres (Excel)</h3>
-                    <p className="text-sm text-muted-foreground mb-5 line-clamp-2">Export complet de l'annuaire avec ID, Secteurs et informations de contact.</p>
                     <button 
                       onClick={exportMembersToCSV}
                       disabled={isExporting}
-                      className="w-full bg-secondary text-foreground hover:bg-green-500 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2 rounded-lg transition-all flex items-center justify-center disabled:opacity-50"
+                      className="w-full bg-secondary text-foreground hover:bg-green-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
                     >
                       {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <Download size={18} className="mr-2" />}
-                      Générer le .CSV
+                      Générer le .CSV (Excel)
                     </button>
                   </div>
 
-                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="p-2 bg-red-500/10 rounded-lg text-red-600 dark:text-red-400">
-                        <FileText size={24} />
+                  {/* Carte 2 : Annuaire Membres (PDF A4) */}
+                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400">
+                          <Users size={24} />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/20">
+                          Impression A4
+                        </span>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <label className="text-xs font-semibold text-muted-foreground">Exercice :</label>
-                        <select
-                          value={reportYear}
-                          onChange={(e) => setReportYear(e.target.value)}
-                          className="bg-secondary text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
-                        >
-                          <option value={currentYear.toString()}>{currentYear} (En cours)</option>
-                          <option value={(currentYear - 1).toString()}>{currentYear - 1}</option>
-                          <option value={(currentYear - 2).toString()}>{currentYear - 2}</option>
-                          <option value="all">Tout l'historique</option>
-                        </select>
+                      <h3 className="font-bold text-foreground mb-1">Annuaire Membres (PDF A4)</h3>
+                      <p className="text-xs text-muted-foreground mb-3 leading-relaxed">Document A4 officiel : démographie, graphique sectoriel et listes groupées par secteur ou feuille de présence.</p>
+                      
+                      <div className="space-y-2 mb-4 bg-secondary/20 p-2.5 rounded-lg border border-border/40">
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="font-semibold text-muted-foreground">Secteur :</label>
+                          <select
+                            value={memberSectorFilter}
+                            onChange={(e) => setMemberSectorFilter(e.target.value)}
+                            className="bg-background text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer max-w-[150px]"
+                          >
+                            <option value="all">Tous les secteurs</option>
+                            {availableSectors.map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="font-semibold text-muted-foreground">Format :</label>
+                          <select
+                            value={memberReportType}
+                            onChange={(e) => setMemberReportType(e.target.value as 'directory' | 'attendance')}
+                            className="bg-background text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                          >
+                            <option value="directory">Annuaire Officiel</option>
+                            <option value="attendance">Feuille d'Émargement</option>
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <h3 className="font-bold text-foreground mb-1">Rapport Financier (PDF A4)</h3>
-                    <p className="text-sm text-muted-foreground mb-5 line-clamp-2">Bilan officiel format A4 : agrégation hebdomadaire (vendredis 23h59m59s), statistiques sectorielles, graphiques & décaissements détaillés.</p>
+                    <button 
+                      onClick={exportMembersToPDF}
+                      disabled={isExporting}
+                      className="w-full bg-secondary text-foreground hover:bg-blue-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
+                    >
+                      {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
+                      Imprimer l'Annuaire (A4)
+                    </button>
+                  </div>
+
+                  {/* Carte 3 : Rapport Financier (PDF A4) */}
+                  <div className="border border-border/50 rounded-xl p-5 bg-background hover:bg-secondary/30 transition-colors group flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="p-2 bg-red-500/10 rounded-lg text-red-600 dark:text-red-400">
+                          <FileText size={24} />
+                        </div>
+                        <div className="flex items-center space-x-1.5">
+                          <label className="text-[10px] font-semibold text-muted-foreground uppercase">Exercice :</label>
+                          <select
+                            value={reportYear}
+                            onChange={(e) => setReportYear(e.target.value)}
+                            className="bg-secondary text-foreground text-xs font-bold px-2 py-1 rounded-md border border-border/60 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+                          >
+                            <option value={currentYear.toString()}>{currentYear} (En cours)</option>
+                            <option value={(currentYear - 1).toString()}>{currentYear - 1}</option>
+                            <option value={(currentYear - 2).toString()}>{currentYear - 2}</option>
+                            <option value="all">Tout l'historique</option>
+                          </select>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-foreground mb-1">Rapport Financier (PDF A4)</h3>
+                      <p className="text-xs text-muted-foreground mb-4 leading-relaxed">Bilan officiel format A4 : agrégation hebdomadaire (vendredis 23h59m59s), statistiques sectorielles, graphiques & décaissements.</p>
+                    </div>
                     <button 
                       onClick={exportFinancialReportPDF}
                       disabled={isExporting}
-                      className="w-full bg-secondary text-foreground hover:bg-red-500 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm"
+                      className="w-full bg-secondary text-foreground hover:bg-red-600 hover:text-white border border-border/50 hover:border-transparent font-medium px-4 py-2.5 rounded-lg transition-all flex items-center justify-center disabled:opacity-50 cursor-pointer shadow-sm text-sm"
                     >
                       {isExporting ? <Loader2 size={18} className="animate-spin mr-2" /> : <FileText size={18} className="mr-2" />}
-                      Imprimer le Rapport (A4)
+                      Imprimer le Bilan (A4)
                     </button>
                   </div>
                 </div>
