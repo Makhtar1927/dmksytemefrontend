@@ -1,9 +1,42 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, Loader2, X, Edit, Shield, CheckCircle, ArrowDownRight, ArrowUpRight, Lock, Mail, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../utils/apiUrl';
 
+const SASS_RUBRIQUES = [
+  'Magal/Gamou',
+  'Ziaar',
+  'Keur Serigne Touba',
+  'Cahier Serigne Mountakha',
+  'Projets',
+  'Achat Carte Membre',
+  'Autres'
+];
+
 type TransactionType = 'Sass' | 'Revenu' | 'Dépense';
+
+type MemberPreview = {
+  first_name?: string;
+  last_name?: string;
+  dmk_id?: string;
+  sector?: string;
+};
+
+type TransactionRaw = {
+  id?: string;
+  amount?: number;
+  status?: string;
+  sass_type?: string;
+  source?: string;
+  description?: string;
+  reason?: string;
+  beneficiary?: string;
+  payment_date?: string;
+  income_date?: string;
+  expense_date?: string;
+  members?: MemberPreview | null;
+  [key: string]: unknown;
+};
 
 type Transaction = {
   id: string; // The original ID
@@ -13,7 +46,8 @@ type Transaction = {
   date: Date;
   actor: string; // First/Last name for Sass, Source for Income, Beneficiary for Expense
   statusOrMethod?: string; // Status or Payment Method for Sass, Description for Income, Reason for Expense
-  raw: any; // Keep the original object to populate the edit form easily
+  rubrique?: string; // Rubrique: sass_type pour Sass, source pour revenu, motif pour dépense
+  raw: TransactionRaw; // Keep the original object to populate the edit form easily
 };
 
 const Transactions = () => {
@@ -37,6 +71,7 @@ const Transactions = () => {
   // Edit form state
   const [editAmount, setEditAmount] = useState('');
   const [editStatus, setEditStatus] = useState(''); // For Sass
+  const [editSassType, setEditSassType] = useState(''); // For Sass Rubrique (Magal/Gamou, Ziaar...)
   const [editSource, setEditSource] = useState(''); // For Income
   const [editDesc, setEditDesc] = useState(''); // For Income
   const [editReason, setEditReason] = useState(''); // For Expense
@@ -50,10 +85,8 @@ const Transactions = () => {
 
   const dropdownRef = useRef<HTMLTableElement>(null);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
-      setLoading(true);
-      
       const { data: contribs, error: contribsError } = await supabase
         .from('sass_contributions')
         .select('*, members:member_id(first_name, last_name, dmk_id, sector)');
@@ -74,15 +107,18 @@ const Transactions = () => {
 
       if (contribs) {
         contribs.forEach(c => {
+          const member = c.members as MemberPreview | null;
+          const memberName = member ? `${member.first_name || ''} ${member.last_name || ''}`.trim() : 'Membre Inconnu';
           history.push({
             id: c.id,
             uniqueId: 'sass_' + c.id,
             type: 'Sass',
             amount: c.amount,
             date: new Date(c.payment_date),
-            actor: c.members ? `${(c.members as any).first_name} ${(c.members as any).last_name}` : 'Membre Inconnu',
+            actor: memberName || 'Membre Inconnu',
             statusOrMethod: c.status,
-            raw: c
+            rubrique: c.sass_type || 'Magal/Gamou',
+            raw: c as unknown as TransactionRaw
           });
         });
       }
@@ -97,7 +133,8 @@ const Transactions = () => {
             date: new Date(i.income_date),
             actor: i.source,
             statusOrMethod: i.description || 'Sans description',
-            raw: i
+            rubrique: i.source || 'Revenu',
+            raw: i as unknown as TransactionRaw
           });
         });
       }
@@ -112,7 +149,8 @@ const Transactions = () => {
             date: new Date(e.expense_date),
             actor: e.beneficiary,
             statusOrMethod: e.reason,
-            raw: e
+            rubrique: e.reason || 'Dépense',
+            raw: e as unknown as TransactionRaw
           });
         });
       }
@@ -121,26 +159,38 @@ const Transactions = () => {
       history.sort((a, b) => b.date.getTime() - a.date.getTime());
       
       setTransactions(history);
-    } catch (err: any) {
-      console.error('Erreur lors du chargement des transactions:', err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      console.error('Erreur lors du chargement des transactions:', message);
       setError('Impossible de charger la liste des transactions.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchTransactions();
+    let isCancelled = false;
+
+    const loadData = async () => {
+      await fetchTransactions();
+    };
+
+    if (!isCancelled) {
+      void loadData();
+    }
 
     const channel = supabase
       .channel('transactions_admin_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'sass_contributions' }, () => fetchTransactions())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_incomes' }, () => fetchTransactions())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_expenses' }, () => fetchTransactions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sass_contributions' }, () => { void fetchTransactions(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_incomes' }, () => { void fetchTransactions(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'treasury_expenses' }, () => { void fetchTransactions(); })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      isCancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [fetchTransactions]);
 
 
 
@@ -154,6 +204,7 @@ const Transactions = () => {
 
     if (tx.type === 'Sass') {
       setEditStatus(tx.raw.status || 'En attente');
+      setEditSassType(tx.raw.sass_type || 'Magal/Gamou');
     } else if (tx.type === 'Revenu') {
       setEditSource(tx.raw.source || '');
       setEditDesc(tx.raw.description || '');
@@ -187,7 +238,7 @@ const Transactions = () => {
 
       const updateData = {
         amount: Number(editAmount),
-        ...(editingTransaction.type === 'Sass' && { status: editStatus }),
+        ...(editingTransaction.type === 'Sass' && { status: editStatus, sass_type: editSassType }),
         ...(editingTransaction.type === 'Revenu' && { source: editSource, description: editDesc }),
         ...(editingTransaction.type === 'Dépense' && { reason: editReason, beneficiary: editBeneficiary }),
       };
@@ -214,9 +265,13 @@ const Transactions = () => {
       setTransactions(prevTransactions => 
         prevTransactions.map(tx => {
           if (tx.uniqueId === editingTransaction.uniqueId) {
+            const updatedRubrique = editingTransaction.type === 'Sass' ? editSassType :
+                                    editingTransaction.type === 'Dépense' ? editReason :
+                                    editingTransaction.type === 'Revenu' ? editSource : tx.rubrique;
             return {
               ...tx,
               amount: Number(editAmount),
+              rubrique: updatedRubrique,
               actor: editingTransaction.type === 'Revenu' ? editSource : 
                      editingTransaction.type === 'Dépense' ? editBeneficiary : tx.actor,
               statusOrMethod: editingTransaction.type === 'Sass' ? editStatus : 
@@ -224,6 +279,7 @@ const Transactions = () => {
               raw: {
                 ...tx.raw,
                 amount: Number(editAmount),
+                sass_type: editingTransaction.type === 'Sass' ? editSassType : tx.raw.sass_type,
                 status: editingTransaction.type === 'Sass' ? editStatus : tx.raw.status,
                 source: editingTransaction.type === 'Revenu' ? editSource : tx.raw.source,
                 description: editingTransaction.type === 'Revenu' ? editDesc : tx.raw.description,
@@ -242,9 +298,10 @@ const Transactions = () => {
       // Fetch in background to ensure consistency
       fetchTransactions();
       
-    } catch (err: any) {
-      console.error("Erreur de modification:", err.message);
-      setAuthError(err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erreur de modification';
+      console.error("Erreur de modification:", message);
+      setAuthError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -261,7 +318,8 @@ const Transactions = () => {
   // Filter transactions
   const filteredTransactions = transactions.filter(tx => {
     const matchSearch = tx.actor.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        (tx.statusOrMethod && tx.statusOrMethod.toLowerCase().includes(searchQuery.toLowerCase()));
+                        (tx.statusOrMethod && tx.statusOrMethod.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                        (tx.rubrique && tx.rubrique.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchType = typeFilter === 'Tous les types' || tx.type === typeFilter;
     return matchSearch && matchType;
   });
@@ -288,7 +346,7 @@ const Transactions = () => {
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-70" size={18} />
             <input 
               type="search" 
-              placeholder="Rechercher par nom, source, motif..." 
+              placeholder="Rechercher par nom, source, rubrique, motif..." 
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
               className="w-full pl-10 pr-4 py-2.5 bg-background border border-border/50 rounded-xl text-sm focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none text-foreground placeholder:text-muted-foreground transition-all shadow-sm"
@@ -318,7 +376,7 @@ const Transactions = () => {
           ) : error ? (
             <div className="flex flex-col items-center justify-center h-[300px] text-red-500">
               <p>{error}</p>
-              <button onClick={fetchTransactions} className="mt-4 bg-secondary text-foreground px-4 py-2 rounded-md hover:bg-muted">Réessayer</button>
+              <button onClick={() => { setLoading(true); void fetchTransactions(); }} className="mt-4 bg-secondary text-foreground px-4 py-2 rounded-md hover:bg-muted">Réessayer</button>
             </div>
           ) : paginatedTransactions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground">
@@ -332,7 +390,7 @@ const Transactions = () => {
                     <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Type</th>
                     <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Date</th>
                     <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Bénéficiaire / Source / Membre</th>
-                    <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Détails / Statut</th>
+                    <th className="px-6 py-4 uppercase tracking-wider text-[11px]">Rubrique / Détails</th>
                     <th className="px-6 py-4 uppercase tracking-wider text-[11px] text-right">Montant</th>
                     <th className="px-6 py-4 uppercase tracking-wider text-[11px] text-right">Actions</th>
                   </tr>
@@ -351,8 +409,32 @@ const Transactions = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-muted-foreground font-medium">{formatDate(tx.date)}</td>
-                      <td className="px-6 py-4 font-bold text-foreground">{tx.actor}</td>
-                      <td className="px-6 py-4 text-muted-foreground font-medium">{tx.statusOrMethod}</td>
+                      <td className="px-6 py-4 font-bold text-foreground">
+                        <div>{tx.actor}</div>
+                        {tx.type === 'Sass' && tx.raw.members?.dmk_id && (
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {tx.raw.members.dmk_id}{tx.raw.members.sector ? ` • ${tx.raw.members.sector}` : ''}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-secondary text-foreground border border-border/60">
+                            {tx.rubrique || 'Général'}
+                          </span>
+                          {tx.type === 'Sass' && (
+                            <span className={`text-[11px] font-semibold ${
+                              tx.raw.status === 'Validé' ? 'text-green-600 dark:text-green-400' :
+                              tx.raw.status === 'Rejeté' ? 'text-red-500' : 'text-amber-500'
+                            }`}>
+                              Statut : {tx.raw.status || 'En attente'}
+                            </span>
+                          )}
+                          {tx.type !== 'Sass' && tx.statusOrMethod && tx.statusOrMethod !== tx.rubrique && (
+                            <span className="text-xs text-muted-foreground truncate max-w-xs">{tx.statusOrMethod}</span>
+                          )}
+                        </div>
+                      </td>
                       <td className={`px-6 py-4 text-right font-extrabold ${tx.type === 'Dépense' ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                         {tx.type === 'Dépense' ? '-' : '+'}{formatMoney(tx.amount)} F
                       </td>
@@ -405,7 +487,7 @@ const Transactions = () => {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-indigo-600"></div>
             <div className="flex items-center justify-between p-5 border-b border-border/50 bg-muted/10">
               <h2 className="text-xl font-bold text-foreground flex items-center">
-                <Shield size={20} className="mr-2 text-primary" /> Validation Administrateur
+                <Shield size={20} className="mr-2 text-primary" /> Modification de Transaction
               </h2>
               <button type="button" onClick={() => setIsModalOpen(false)} className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-colors">
                 <X size={20} />
@@ -416,7 +498,10 @@ const Transactions = () => {
               
               <div className="bg-secondary/30 p-4 rounded-xl border border-border/50">
                 <p className="text-sm font-bold text-foreground mb-1">Modification de transaction ({editingTransaction.type})</p>
-                <p className="text-xs text-muted-foreground">Opération initiale du {formatDate(editingTransaction.date)} pour {editingTransaction.actor}</p>
+                <p className="text-xs text-muted-foreground">
+                  Opération du {formatDate(editingTransaction.date)} pour {editingTransaction.actor}
+                  {editingTransaction.rubrique ? ` • Rubrique actuelle : ${editingTransaction.rubrique}` : ''}
+                </p>
               </div>
 
               {/* DYNAMIC FORM FIELDS */}
@@ -427,20 +512,41 @@ const Transactions = () => {
                 </div>
 
                 {editingTransaction.type === 'Sass' && (
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-1">Statut (actuel: {editingTransaction.raw.status})</label>
-                    <select required value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none">
-                      <option value="Validé">Validé</option>
-                      <option value="En attente">En attente</option>
-                      <option value="Rejeté">Rejeté</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Rubrique de la cotisation (Sass) *
+                      </label>
+                      <select 
+                        required 
+                        value={editSassType} 
+                        onChange={e => setEditSassType(e.target.value)} 
+                        className="w-full bg-secondary border border-border rounded-lg px-3 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none cursor-pointer"
+                      >
+                        {editSassType && !SASS_RUBRIQUES.includes(editSassType) && (
+                          <option value={editSassType}>{editSassType}</option>
+                        )}
+                        {SASS_RUBRIQUES.map(rubric => (
+                          <option key={rubric} value={rubric}>{rubric}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">Statut (actuel: {editingTransaction.raw.status})</label>
+                      <select required value={editStatus} onChange={e => setEditStatus(e.target.value)} className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none">
+                        <option value="Validé">Validé</option>
+                        <option value="En attente">En attente</option>
+                        <option value="Rejeté">Rejeté</option>
+                      </select>
+                    </div>
+                  </>
                 )}
 
                 {editingTransaction.type === 'Revenu' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Source</label>
+                      <label className="block text-sm font-medium text-foreground mb-1">Source / Rubrique</label>
                       <input required value={editSource} onChange={e => setEditSource(e.target.value)} type="text" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
@@ -457,8 +563,29 @@ const Transactions = () => {
                       <input required value={editBeneficiary} onChange={e => setEditBeneficiary(e.target.value)} type="text" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Motif / Raison</label>
-                      <input required value={editReason} onChange={e => setEditReason(e.target.value)} type="text" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                      <label className="block text-sm font-medium text-foreground mb-1">Rubrique / Raison de la dépense</label>
+                      <input 
+                        required 
+                        list="expense-reasons-list"
+                        value={editReason} 
+                        onChange={e => setEditReason(e.target.value)} 
+                        type="text" 
+                        placeholder="Ex: Magal, Gamou, Ziaar, Transport..."
+                        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" 
+                      />
+                      <datalist id="expense-reasons-list">
+                        <option value="Magal" />
+                        <option value="Gamou" />
+                        <option value="Ziaar" />
+                        <option value="Achat Logistique" />
+                        <option value="Location Sono/Matériel" />
+                        <option value="Restauration / Alimentation" />
+                        <option value="Transport" />
+                        <option value="Aumône (Hadiya)" />
+                        <option value="Frais administratifs" />
+                        <option value="Secours social" />
+                        <option value="Autre" />
+                      </datalist>
                     </div>
                   </>
                 )}
