@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Search, Loader2, X, Edit, Shield, CheckCircle, ArrowDownRight, ArrowUpRight, Lock, Mail, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../utils/apiUrl';
+import { useAuth } from '../contexts/AuthContext';
 
 const SASS_RUBRIQUES = [
   'Magal/Gamou',
@@ -51,6 +52,7 @@ type Transaction = {
 };
 
 const Transactions = () => {
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -198,7 +200,7 @@ const Transactions = () => {
     setEditingTransaction(tx);
     setEditAmount(tx.amount.toString());
     setEditMotive('');
-    setAdminEmail('');
+    setAdminEmail(user?.email || '');
     setAdminPassword('');
     setAuthError('');
 
