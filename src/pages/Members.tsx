@@ -46,6 +46,15 @@ const ROLES = [
   "Sage", "Commissaire au compte"
 ];
 
+const TITLE_CASE_FIELDS = ['first_name', 'last_name', 'birth_place', 'profession', 'address'];
+
+export const formatTitleCase = (val: string): string => {
+  if (!val) return '';
+  return val.replace(/\p{L}+/gu, (word) => {
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+};
+
 const Members = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +210,16 @@ const Members = () => {
   }, [page, searchQuery, roleFilter, sectorFilter, sassFilter, statusFilter]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    let formattedValue = value;
+
+    if (TITLE_CASE_FIELDS.includes(name)) {
+      formattedValue = formatTitleCase(value);
+    } else if (name === 'email') {
+      formattedValue = value.toLowerCase();
+    }
+
+    setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
   const generateDmkId = async () => {
@@ -309,6 +327,12 @@ const Members = () => {
     }
 
     setIsSubmitting(true);
+
+    const cleanFirstName = formatTitleCase(formData.first_name.trim());
+    const cleanLastName = formatTitleCase(formData.last_name.trim());
+    const cleanBirthPlace = formData.birth_place ? formatTitleCase(formData.birth_place.trim()) : null;
+    const cleanAddress = formData.address ? formatTitleCase(formData.address.trim()) : null;
+    const cleanProfession = formData.profession ? formatTitleCase(formData.profession.trim()) : null;
     
     try {
       if (editingMember) {
@@ -339,22 +363,22 @@ const Members = () => {
         const { error } = await supabase
           .from('members')
           .update({
-            first_name: formData.first_name,
-            last_name: formData.last_name,
+            first_name: cleanFirstName,
+            last_name: cleanLastName,
             email: newEmail,
             phone: formData.phone || null,
             role: formData.role,
             sector: formData.sector || null,
             birth_date: formData.birth_date || null,
-            birth_place: formData.birth_place || null,
-            address: formData.address || null,
+            birth_place: cleanBirthPlace,
+            address: cleanAddress,
             cni_number: formData.cni_number || null,
             cni_issue_date: formData.cni_issue_date || null,
             cni_expiry_date: formData.cni_expiry_date || null,
             blood_type: formData.blood_type || null,
             gender: formData.gender || null,
             join_date: formData.join_date || null,
-            profession: formData.profession || null,
+            profession: cleanProfession,
             sass_magal: parsedMagal,
             sass_ziaar: parsedZiaar,
             sass_kst: parsedKst,
@@ -366,7 +390,7 @@ const Members = () => {
 
         if (error) throw error;
         
-        await logActivity('MODIFICATION', 'MEMBRE', `Modification des informations de ${formData.first_name} ${formData.last_name}`, formData.sector || 'N/A');
+        await logActivity('MODIFICATION', 'MEMBRE', `Modification des informations de ${cleanFirstName} ${cleanLastName}`, formData.sector || 'N/A');
       } else {
         // Insert new member
         const dmk_id = await generateDmkId();
@@ -378,21 +402,21 @@ const Members = () => {
         // 2. Préparation des données du membre
         const newMemberData = {
           dmk_id,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
+          first_name: cleanFirstName,
+          last_name: cleanLastName,
           phone: formData.phone || null,
           role: formData.role,
           sector: formData.sector || null,
           birth_date: formData.birth_date || null,
-          birth_place: formData.birth_place || null,
-          address: formData.address || null,
+          birth_place: cleanBirthPlace,
+          address: cleanAddress,
           cni_number: formData.cni_number || null,
           cni_issue_date: formData.cni_issue_date || null,
           cni_expiry_date: formData.cni_expiry_date || null,
           blood_type: formData.blood_type || null,
           gender: formData.gender || null,
           join_date: formData.join_date || null,
-          profession: formData.profession || null,
+          profession: cleanProfession,
           sass_magal: parsedMagal,
           sass_ziaar: parsedZiaar,
           sass_kst: parsedKst,
