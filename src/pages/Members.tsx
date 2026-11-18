@@ -279,17 +279,30 @@ const Members = () => {
     setIsModalOpen(true);
   };
 
+  const parseNumericCommitment = (val: unknown): number => {
+    if (val === '' || val === null || val === undefined) return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : Math.max(0, num);
+  };
+
   const handleSaveMember = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const parsedMagal = parseNumericCommitment(formData.sass_magal);
+    const parsedZiaar = parseNumericCommitment(formData.sass_ziaar);
+    const parsedKst = parseNumericCommitment(formData.sass_kst);
+    const parsedCahier = parseNumericCommitment(formData.sass_cahier);
+    const parsedProjets = parseNumericCommitment(formData.sass_projets);
+    const parsedAutres = parseNumericCommitment(formData.sass_autres);
+
     // Validation des valeurs négatives pour les engagements
     if (
-      (formData.sass_magal && formData.sass_magal < 0) ||
-      (formData.sass_ziaar && formData.sass_ziaar < 0) ||
-      (formData.sass_kst && formData.sass_kst < 0) ||
-      (formData.sass_cahier && formData.sass_cahier < 0) ||
-      (formData.sass_projets && formData.sass_projets < 0) ||
-      (formData.sass_autres && formData.sass_autres < 0)
+      parsedMagal < 0 ||
+      parsedZiaar < 0 ||
+      parsedKst < 0 ||
+      parsedCahier < 0 ||
+      parsedProjets < 0 ||
+      parsedAutres < 0
     ) {
       alert("Les engagements financiers ne peuvent pas être négatifs.");
       return;
@@ -342,12 +355,12 @@ const Members = () => {
             gender: formData.gender || null,
             join_date: formData.join_date || null,
             profession: formData.profession || null,
-            sass_magal: formData.sass_magal,
-            sass_ziaar: formData.sass_ziaar,
-            sass_kst: formData.sass_kst,
-            sass_cahier: formData.sass_cahier,
-            sass_projets: formData.sass_projets,
-            sass_autres: formData.sass_autres,
+            sass_magal: parsedMagal,
+            sass_ziaar: parsedZiaar,
+            sass_kst: parsedKst,
+            sass_cahier: parsedCahier,
+            sass_projets: parsedProjets,
+            sass_autres: parsedAutres,
           })
           .eq('id', editingMember.id);
 
@@ -380,12 +393,12 @@ const Members = () => {
           gender: formData.gender || null,
           join_date: formData.join_date || null,
           profession: formData.profession || null,
-          sass_magal: formData.sass_magal,
-          sass_ziaar: formData.sass_ziaar,
-          sass_kst: formData.sass_kst,
-          sass_cahier: formData.sass_cahier,
-          sass_projets: formData.sass_projets,
-          sass_autres: formData.sass_autres,
+          sass_magal: parsedMagal,
+          sass_ziaar: parsedZiaar,
+          sass_kst: parsedKst,
+          sass_cahier: parsedCahier,
+          sass_projets: parsedProjets,
+          sass_autres: parsedAutres,
           status: 'Actif'
         };
 
