@@ -920,11 +920,13 @@ const Settings = () => {
 
       const topSector = sectorStatsList.length > 0 ? sectorStatsList[0] : null;
 
-      // 2. Agrégation Hebdomadaire par Vendredi (Clôture 23h59m59s — juste avant Samedi 00h00m00s)
+      // 2. Agrégation Hebdomadaire du Samedi 00h00 au Vendredi 23h59m59s
       type WeekData = {
         fridayDate: Date;
+        startDate: Date;
         dateKey: string;
         formattedDate: string;
+        formattedRange: string;
         total: number;
         count: number;
         sectorBreakdown: { [sector: string]: number };
@@ -939,10 +941,16 @@ const Settings = () => {
         const amount = Number(c.amount || 0);
 
         if (!weekMap[dateKey]) {
+          const startSaturday = new Date(friday);
+          startSaturday.setDate(friday.getDate() - 6);
+          startSaturday.setHours(0, 0, 0, 0);
+
           weekMap[dateKey] = {
             fridayDate: friday,
+            startDate: startSaturday,
             dateKey,
             formattedDate: format(friday, 'dd/MM/yyyy'),
+            formattedRange: `Sam. ${format(startSaturday, 'dd/MM')} au Ven. ${format(friday, 'dd/MM/yyyy')}`,
             total: 0,
             count: 0,
             sectorBreakdown: {}
@@ -1526,18 +1534,18 @@ const Settings = () => {
               </tr>
             </table>
 
-            <!-- SECTION 2 : Bilan Hebdomadaire des Collectes par Secteur (Clôture chaque Vendredi à 23h59m59s) -->
+            <!-- SECTION 2 : Bilan Hebdomadaire des Collectes par Secteur (Samedi 00h00 au Vendredi 23h59) -->
             <div class="section-heading avoid-break">
-              <span>2. Synthèse Hebdomadaire des Collectes par Secteur (Vendredis — 23h59m59s)</span>
-              <span class="section-subtitle">Période clôturée chaque vendredi à 23h59m59s (juste avant Samedi 00h00m00s)</span>
+              <span>2. Synthèse Hebdomadaire des Collectes par Secteur (Samedi 00h00 au Vendredi 23h59)</span>
+              <span class="section-subtitle">Période hebdomadaire du samedi 00h00m00s au vendredi 23h59m59s</span>
             </div>
 
             <table>
               <thead>
                 <tr>
-                  <th style="width: 40px;" class="text-center">Sem.</th>
-                  <th style="width: 120px;">Clôture (Vendredi 23h59m59s)</th>
-                  <th class="text-center" style="width: 60px;">Reçus</th>
+                  <th style="width: 35px;" class="text-center">Sem.</th>
+                  <th style="width: 155px;">Semaine (Samedi au Vendredi 23h59)</th>
+                  <th class="text-center" style="width: 55px;">Reçus</th>
                   <th>Détail des Collectes par Secteur</th>
                   <th class="text-right" style="width: 105px;">Total Semaine</th>
                   <th class="text-right" style="width: 110px;">Cumul Annuel</th>
@@ -1553,7 +1561,7 @@ const Settings = () => {
                   return `
                     <tr>
                       <td class="text-center font-bold" style="color: #64748b;">${idx + 1}</td>
-                      <td class="font-bold">Ven. ${w.formattedDate} <span style="font-size: 8px; color: #64748b;">(23h59m59s)</span></td>
+                      <td class="font-bold">${w.formattedRange}</td>
                       <td class="text-center font-bold">${w.count}</td>
                       <td>${sectorBadges}</td>
                       <td class="text-right font-black" style="color: #1e3a8a;">+ ${w.total.toLocaleString('fr-FR')} F</td>
