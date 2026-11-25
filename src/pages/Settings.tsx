@@ -54,6 +54,14 @@ interface Expense {
   reason: string;
 }
 
+interface TreasuryIncome {
+  id: string;
+  amount: number;
+  income_date: string;
+  category?: string;
+  description?: string;
+}
+
 const Settings = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('donnees');
@@ -831,6 +839,26 @@ const Settings = () => {
         }
       }
 
+      // Récupération exhaustive des revenus libres trésorerie (Barkelou, projets, etc.)
+      let allTreasuryIncomes: TreasuryIncome[] = [];
+      from = 0;
+      hasMore = true;
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('treasury_incomes')
+          .select('*')
+          .order('income_date', { ascending: false })
+          .range(from, from + 999);
+        if (error) throw error;
+        if (data && data.length > 0) {
+          allTreasuryIncomes = [...allTreasuryIncomes, ...data as TreasuryIncome[]];
+          from += 1000;
+          if (data.length < 1000) hasMore = false;
+        } else {
+          hasMore = false;
+        }
+      }
+
       // Filtrage selon l'année d'exercice sélectionnée
       const targetYearNum = parseInt(reportYear, 10);
       const isYearFiltered = reportYear !== 'all' && !isNaN(targetYearNum);
@@ -858,8 +886,19 @@ const Settings = () => {
         return true;
       });
 
-      // Métriques Globales
-      const totalIncomes = validContribs.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const filteredTreasuryIncomes = allTreasuryIncomes.filter(inc => {
+        if (!inc.income_date) return false;
+        if (isYearFiltered) {
+          const d = new Date(inc.income_date);
+          if (d.getFullYear() !== targetYearNum) return false;
+        }
+        return true;
+      });
+
+      // Métriques Globales (Sass validés + Revenus libres trésorerie)
+      const totalSassIncomes = validContribs.reduce((sum, c) => sum + Number(c.amount || 0), 0);
+      const totalFreeIncomes = filteredTreasuryIncomes.reduce((sum, inc) => sum + Number(inc.amount || 0), 0);
+      const totalIncomes = totalSassIncomes + totalFreeIncomes;
       const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
       const netBalance = totalIncomes - totalExpenses;
       const absorptionRate = totalIncomes > 0 ? ((totalExpenses / totalIncomes) * 100).toFixed(1) : '0.0';
@@ -909,7 +948,7 @@ const Settings = () => {
         .map((name, idx) => {
           const total = sectorMap[name].total;
           const count = sectorMap[name].count;
-          const percentage = totalIncomes > 0 ? (total / totalIncomes) * 100 : 0;
+          const percentage = totalSassIncomes > 0 ? (total / totalSassIncomes) * 100 : 0;
           const average = count > 0 ? Math.round(total / count) : 0;
           const color = PALETTE[idx % PALETTE.length];
           return { name, total, count, percentage, average, color };
@@ -972,7 +1011,7 @@ const Settings = () => {
         if (!maxWeek || w.total > maxWeek.total) maxWeek = w;
       });
 
-      const avgWeeklyIncome = sortedWeeks.length > 0 ? Math.round(totalIncomes / sortedWeeks.length) : 0;
+      const avgWeeklyIncome = sortedWeeks.length > 0 ? Math.round(totalSassIncomes / sortedWeeks.length) : 0;
 
       // 3. Génération des Diagrammes Vectoriels SVG (100% vectoriel, net à l'impression)
       // A. Diagramme Circulaire Donut SVG (Répartition par secteur)
@@ -988,7 +1027,7 @@ const Settings = () => {
           name: 'Autres Secteurs',
           total: otherSectorsTotal,
           count: sectorStatsList.slice(8).reduce((acc, s) => acc + s.count, 0),
-          percentage: totalIncomes > 0 ? (otherSectorsTotal / totalIncomes) * 100 : 0,
+          percentage: totalSassIncomes > 0 ? (otherSectorsTotal / totalSassIncomes) * 100 : 0,
           average: 0,
           color: '#94a3b8'
         });
@@ -1150,7 +1189,7 @@ const Settings = () => {
               /* KPIs */
               .kpi-grid {
                 display: grid;
-                grid-template-columns: repeat(4, 1fr);
+                grid-template-columns: repeat(3, 1fr);
                 gap: 10px;
                 margin-bottom: 14px;
               }
@@ -1398,18 +1437,26 @@ const Settings = () => {
             <div class="kpi-grid avoid-break">
               <div class="kpi-card">
                 <div class="kpi-label">1. Entrées Sass (Validées)</div>
+                <div class="kpi-value kpi-income">+ ${totalSassIncomes.toLocaleString('fr-FR')} F</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">2. Autres Entrées Trésorerie</div>
+                <div class="kpi-value kpi-income">+ ${totalFreeIncomes.toLocaleString('fr-FR')} F</div>
+              </div>
+              <div class="kpi-card">
+                <div class="kpi-label">3. Total Entrées Global</div>
                 <div class="kpi-value kpi-income">+ ${totalIncomes.toLocaleString('fr-FR')} F</div>
               </div>
               <div class="kpi-card">
-                <div class="kpi-label">2. Sorties (Décaissements)</div>
+                <div class="kpi-label">4. Sorties (Décaissements)</div>
                 <div class="kpi-value kpi-expense">- ${totalExpenses.toLocaleString('fr-FR')} F</div>
               </div>
               <div class="kpi-card">
-                <div class="kpi-label">3. Solde Net Caisse</div>
+                <div class="kpi-label">5. Solde Net Caisse</div>
                 <div class="kpi-value kpi-net">${netBalance.toLocaleString('fr-FR')} F</div>
               </div>
               <div class="kpi-card">
-                <div class="kpi-label">4. Taux de Couverture</div>
+                <div class="kpi-label">6. Taux de Couverture</div>
                 <div class="kpi-value kpi-rate">${absorptionRate}%</div>
               </div>
             </div>
@@ -1433,8 +1480,8 @@ const Settings = () => {
                     <svg width="150" height="150" viewBox="0 0 160 160">
                       ${donutSlicesSvg}
                       <circle cx="80" cy="80" r="38" fill="#ffffff" />
-                      <text x="80" y="74" text-anchor="middle" font-size="8" font-weight="700" fill="#64748b">TOTAL ENTRÉES</text>
-                      <text x="80" y="89" text-anchor="middle" font-size="9.5" font-weight="900" fill="#1e3a8a">${(totalIncomes >= 1000000 ? (totalIncomes / 1000000).toFixed(1) + 'M' : totalIncomes.toLocaleString('fr-FR'))} F</text>
+                      <text x="80" y="74" text-anchor="middle" font-size="8" font-weight="700" fill="#64748b">TOTAL SASS</text>
+                      <text x="80" y="89" text-anchor="middle" font-size="9.5" font-weight="900" fill="#1e3a8a">${(totalSassIncomes >= 1000000 ? (totalSassIncomes / 1000000).toFixed(1) + 'M' : totalSassIncomes.toLocaleString('fr-FR'))} F</text>
                     </svg>
                   </div>
                   <div style="flex: 1;">
@@ -1511,8 +1558,8 @@ const Settings = () => {
                 <tr class="total-row">
                   <td colspan="3" class="font-black text-right" style="text-transform: uppercase;">Total Général Entrées Sass :</td>
                   <td class="text-center font-black">${validContribs.length}</td>
-                  <td class="text-right font-bold">${validContribs.length > 0 ? Math.round(totalIncomes / validContribs.length).toLocaleString('fr-FR') : 0} F</td>
-                  <td class="text-right font-black" style="color: #15803d; font-size: 11px;">${totalIncomes.toLocaleString('fr-FR')} F CFA</td>
+                  <td class="text-right font-bold">${validContribs.length > 0 ? Math.round(totalSassIncomes / validContribs.length).toLocaleString('fr-FR') : 0} F</td>
+                  <td class="text-right font-black" style="color: #15803d; font-size: 11px;">+ ${totalSassIncomes.toLocaleString('fr-FR')} F CFA</td>
                 </tr>
               </tbody>
             </table>
@@ -1570,16 +1617,49 @@ const Settings = () => {
                   <tr><td colspan="6" class="text-center" style="padding: 12px; color: #64748b;">Aucune clôture hebdomadaire enregistrée</td></tr>
                 `}
                 <tr class="total-row">
-                  <td colspan="4" class="font-black text-right" style="text-transform: uppercase;">Total Cumulé des Clôtures Hebdomadaires :</td>
-                  <td class="text-right font-black" style="color: #15803d; font-size: 10.5px;">+ ${totalIncomes.toLocaleString('fr-FR')} F</td>
-                  <td class="text-right font-black" style="color: #15803d; font-size: 10.5px;">${totalIncomes.toLocaleString('fr-FR')} F</td>
+                  <td colspan="4" class="font-black text-right" style="text-transform: uppercase;">Total Cumulé des Clôtures Hebdomadaires (Sass) :</td>
+                  <td class="text-right font-black" style="color: #15803d; font-size: 10.5px;">+ ${totalSassIncomes.toLocaleString('fr-FR')} F</td>
+                  <td class="text-right font-black" style="color: #15803d; font-size: 10.5px;">${totalSassIncomes.toLocaleString('fr-FR')} F</td>
                 </tr>
               </tbody>
             </table>
 
-            <!-- SECTION 3 : Sorties - Décaissements Détaillés (Conservé comme à l'origine) -->
+            <!-- SECTION 3 : Autres Entrées / Encaissements Trésorerie (Barkelou, Projets...) -->
             <div class="section-heading avoid-break" style="margin-top: 20px;">
-              <span>3. Sorties : Détail Exhaustif des Décaissements / Dépenses</span>
+              <span>3. Autres Entrées : Encaissements Trésorerie (Barkelou, Projets, Dons...)</span>
+              <span class="section-subtitle">${filteredTreasuryIncomes.length} encaissement${filteredTreasuryIncomes.length > 1 ? 's' : ''} enregistré${filteredTreasuryIncomes.length > 1 ? 's' : ''}</span>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 80px;">Date</th>
+                  <th style="width: 150px;">Catégorie / Source</th>
+                  <th>Description / Détails</th>
+                  <th class="text-right" style="width: 110px;">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${filteredTreasuryIncomes.length > 0 ? filteredTreasuryIncomes.map(inc => `
+                  <tr>
+                    <td style="white-space: nowrap;">${inc.income_date ? format(new Date(inc.income_date), 'dd/MM/yyyy') : '-'}</td>
+                    <td class="font-bold" style="color: #1e3a8a;">${inc.category || 'Autre entrée'}</td>
+                    <td>${inc.description || 'Encaissement trésorerie'}</td>
+                    <td class="text-right font-bold" style="color: #15803d;">+ ${Number(inc.amount).toLocaleString('fr-FR')} F</td>
+                  </tr>
+                `).join('') : `
+                  <tr><td colspan="4" class="text-center" style="padding: 12px; color: #64748b;">Aucun autre encaissement enregistré sur cet exercice</td></tr>
+                `}
+                <tr class="total-row">
+                  <td colspan="3" class="font-black text-right" style="text-transform: uppercase;">Total Général des Autres Entrées :</td>
+                  <td class="text-right font-black" style="color: #15803d; font-size: 11px;">+ ${totalFreeIncomes.toLocaleString('fr-FR')} F CFA</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- SECTION 4 : Sorties - Décaissements Détaillés -->
+            <div class="section-heading avoid-break" style="margin-top: 20px;">
+              <span>4. Sorties : Détail Exhaustif des Décaissements / Dépenses</span>
               <span class="section-subtitle">${filteredExpenses.length} décaissements enregistrés</span>
             </div>
 
