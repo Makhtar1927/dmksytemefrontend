@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPrintWindow, printDocument } from '../utils/printUtils';
 import { Shield, Lock, Bell, Download, FileText, AlertTriangle, Loader2, Database, X, Users, Mail, Plus, CheckCircle, Smartphone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { format } from 'date-fns';
@@ -279,6 +280,7 @@ const Settings = () => {
   // Export Members Directory to PDF (A4 Print Engine)
   const exportMembersToPDF = async () => {
     setIsExporting(true);
+    const targetWindow = createPrintWindow();
     try {
       let allMembers: Member[] = [];
       let from = 0;
@@ -768,15 +770,10 @@ const Settings = () => {
         </html>
       `;
 
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-      } else {
-        alert("Veuillez autoriser les fenêtres pop-up dans votre navigateur pour imprimer l'annuaire.");
-      }
+      printDocument(html, targetWindow);
 
     } catch (err) {
+      if (targetWindow && !targetWindow.closed) targetWindow.close();
       alert("Erreur lors de la génération du document: " + (err as Error).message);
     } finally {
       setIsExporting(false);
@@ -786,6 +783,7 @@ const Settings = () => {
   // Export Financial Report to PDF (A4 Print Engine)
   const exportFinancialReportPDF = async () => {
     setIsExporting(true);
+    const targetWindow = createPrintWindow();
     try {
       let allContribs: Contribution[] = [];
       let from = 0;
@@ -1651,15 +1649,10 @@ const Settings = () => {
         </html>
       `;
 
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(html);
-        printWindow.document.close();
-      } else {
-        alert("Veuillez autoriser les fenêtres pop-up dans votre navigateur pour imprimer le rapport.");
-      }
+      printDocument(html, targetWindow);
 
     } catch (err) {
+      if (targetWindow && !targetWindow.closed) targetWindow.close();
       alert("Erreur lors de la génération du rapport: " + (err as Error).message);
     } finally {
       setIsExporting(false);
