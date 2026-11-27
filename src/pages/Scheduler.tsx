@@ -33,6 +33,7 @@ type EventData = {
   title: string;
   event_type: string;
   event_date: string;
+  end_date?: string | null;
   location: string | null;
   description: string | null;
   maps_link: string | null;
@@ -153,6 +154,7 @@ const Scheduler = () => {
     title: '',
     event_type: 'Dahira',
     event_date: '',
+    end_date: '',
     location: '',
     description: '',
     maps_link: '',
@@ -178,7 +180,9 @@ const Scheduler = () => {
         
         if (!isValid(startDate)) return null;
 
-        const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // +2 hours
+        const endDate = evt.end_date && isValid(new Date(evt.end_date))
+          ? new Date(evt.end_date)
+          : new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // +2 hours par défaut
         return {
           id: evt.id,
           title: evt.title,
@@ -231,6 +235,17 @@ const Scheduler = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const target = e.target;
     const value = target.type === 'checkbox' ? (target as HTMLInputElement).checked : target.value;
+    if (target.name === 'event_date' && typeof value === 'string' && value) {
+      const start = new Date(value);
+      setFormData((prev) => {
+        const shouldAutoEnd = !prev.end_date || new Date(prev.end_date) <= start;
+        const autoEnd = shouldAutoEnd && isValid(start)
+          ? format(new Date(start.getTime() + 2 * 60 * 60 * 1000), "yyyy-MM-dd'T'HH:mm")
+          : prev.end_date;
+        return { ...prev, event_date: value, end_date: autoEnd };
+      });
+      return;
+    }
     setFormData({ ...formData, [target.name]: value });
   };
 
@@ -247,20 +262,33 @@ const Scheduler = () => {
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title || !formData.event_date) {
+    if (!formData.title || !formData.event_date || !formData.end_date) {
       alert("Veuillez remplir les champs obligatoires (*).");
+      return;
+    }
+
+    const startObj = new Date(formData.event_date);
+    const endObj = new Date(formData.end_date);
+    if (!isValid(startObj) || !isValid(endObj)) {
+      alert("Format de date/heure invalide.");
+      return;
+    }
+    if (endObj <= startObj) {
+      alert("L'heure de fin doit être postérieure à l'heure de début.");
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      const eventDate = new Date(formData.event_date).toISOString();
+      const eventDate = startObj.toISOString();
+      const endDate = endObj.toISOString();
       
       const eventPayload: Partial<EventData> = {
         title: formData.title,
         event_type: formData.event_type,
         event_date: eventDate,
+        end_date: endDate,
         location: formData.location || null,
         description: formData.description || null,
         maps_link: formData.maps_link || null,
@@ -409,6 +437,7 @@ const Scheduler = () => {
       title: '',
       event_type: 'Dahira',
       event_date: '',
+      end_date: '',
       location: '',
       description: '',
       maps_link: '',
@@ -422,11 +451,16 @@ const Scheduler = () => {
 
   const handleEditClick = (evt: FormattedEvent) => {
     const res = evt.resource;
+    const startObj = new Date(res.event_date);
+    const endObj = res.end_date && isValid(new Date(res.end_date))
+      ? new Date(res.end_date)
+      : new Date(startObj.getTime() + 2 * 60 * 60 * 1000);
     setEditingEventId(evt.id);
     setFormData({
       title: evt.title,
       event_type: res.event_type,
-      event_date: new Date(res.event_date).toISOString().slice(0, 16),
+      event_date: isValid(startObj) ? format(startObj, "yyyy-MM-dd'T'HH:mm") : '',
+      end_date: isValid(endObj) ? format(endObj, "yyyy-MM-dd'T'HH:mm") : '',
       location: res.location || '',
       description: res.description || '',
       maps_link: res.maps_link || '',
@@ -519,20 +553,25 @@ const Scheduler = () => {
                 <input required name="title" value={formData.title} onChange={handleInputChange} type="text" placeholder="Ex: Réunion Bureau Mensuelle" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Type *</label>
+                <select name="event_type" value={formData.event_type} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none">
+                  <option value="Bureau">Réunion Bureau</option>
+                  <option value="Dahira">Dahira Mensuel</option>
+                  <option value="AG">Assemblée Générale</option>
+                  <option value="Magal">Magal / Gamou</option>
+                  <option value="Autre">Autre Événement</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Type *</label>
-                  <select name="event_type" value={formData.event_type} onChange={handleInputChange} className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none">
-                    <option value="Bureau">Réunion Bureau</option>
-                    <option value="Dahira">Dahira Mensuel</option>
-                    <option value="AG">Assemblée Générale</option>
-                    <option value="Magal">Magal / Gamou</option>
-                    <option value="Autre">Autre Événement</option>
-                  </select>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date et Heure de début *</label>
+                  <input required name="event_date" value={formData.event_date} onChange={handleInputChange} type="datetime-local" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date et Heure *</label>
-                  <input required name="event_date" value={formData.event_date} onChange={handleInputChange} type="datetime-local" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
+                  <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Date et Heure de fin *</label>
+                  <input required name="end_date" value={formData.end_date} onChange={handleInputChange} min={formData.event_date || undefined} type="datetime-local" className="w-full bg-secondary border border-border rounded-xl px-4 py-2.5 text-foreground font-semibold focus:ring-2 focus:ring-primary outline-none" />
                 </div>
               </div>
 
