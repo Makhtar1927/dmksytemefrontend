@@ -273,9 +273,9 @@ const Transactions = () => {
         })
       });
 
-      const result = await response.json();
-      if (!response.ok || result.status === 'error') {
-        throw new Error(result.message || "Erreur lors de la modification");
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.status === 'error') {
+        throw new Error(result?.message || `Erreur serveur (${response.status}) lors de la modification`);
       }
 
       // 4. Update local state immediately for visual feedback
@@ -357,9 +357,39 @@ const Transactions = () => {
         })
       });
 
-      const result = await response.json();
-      if (!response.ok || result.status === 'error') {
-        throw new Error(result.message || "Erreur lors de l'annulation de la transaction");
+      if (response.status === 404) {
+        // Fallback si le backend Render n'a pas encore fini son déploiement : suppression directe via session authentifiée
+        const { error: authErr } = await supabase.auth.signInWithPassword({
+          email: adminEmail.trim(),
+          password: adminPassword
+        });
+        if (authErr) {
+          throw new Error('Identifiants administrateur incorrects.');
+        }
+
+        const tableName =
+          editingTransaction.type === 'Sass' ? 'sass_contributions' :
+          editingTransaction.type === 'Revenu' ? 'treasury_incomes' : 'treasury_expenses';
+
+        const { error: delErr } = await supabase
+          .from(tableName)
+          .delete()
+          .eq('id', editingTransaction.id);
+
+        if (delErr) throw delErr;
+
+        await supabase.from('activity_logs').insert([{
+          user_email: adminEmail.trim(),
+          action_type: 'ANNULATION',
+          entity_type: 'FINANCES',
+          details: `Annulation/Suppression transaction ${editingTransaction.type} (ID: ${editingTransaction.id}). Montant: ${editingTransaction.amount} F, Acteur/Source: ${editingTransaction.actor}. Motif admin: ${editMotive.trim()}`,
+          sector: 'Admin Général'
+        }]);
+      } else {
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.status === 'error') {
+          throw new Error(result?.message || `Erreur serveur (${response.status}) lors de l'annulation`);
+        }
       }
 
       setTransactions(prev => prev.filter(tx => tx.uniqueId !== editingTransaction.uniqueId));
