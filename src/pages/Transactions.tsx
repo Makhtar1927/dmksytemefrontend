@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { Search, Loader2, X, Edit, Shield, CheckCircle, ArrowDownRight, ArrowUpRight, Lock, Mail, AlertTriangle } from 'lucide-react';
+import { Search, Loader2, X, Edit, Shield, CheckCircle, ArrowDownRight, ArrowUpRight, Lock, Mail, AlertTriangle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getApiUrl } from '../utils/apiUrl';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,14 @@ const SASS_RUBRIQUES = [
   'Projets',
   'Achat Carte Membre',
   'Autres'
+];
+
+const INCOME_SOURCES = [
+  'Barkelou',
+  'Bénéfices Projets/Événements',
+  'Dons Anonymes',
+  'Apport Extérieur',
+  'Autre'
 ];
 
 type TransactionType = 'Sass' | 'Revenu' | 'Dépense';
@@ -68,6 +76,7 @@ const Transactions = () => {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Edit form state
@@ -227,6 +236,12 @@ const Transactions = () => {
       return;
     }
 
+    const parsedAmount = Number(editAmount);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      setAuthError('Veuillez saisir un montant valide supérieur à 0.');
+      return;
+    }
+
     if (!adminEmail || !adminPassword) {
       setAuthError('Les identifiants administrateur sont requis.');
       return;
@@ -306,6 +321,57 @@ const Transactions = () => {
       setAuthError(message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!editingTransaction) return;
+
+    if (!editMotive.trim()) {
+      setAuthError("Le motif d'annulation/suppression est obligatoire.");
+      return;
+    }
+
+    if (!adminEmail || !adminPassword) {
+      setAuthError('Les identifiants administrateur sont requis.');
+      return;
+    }
+
+    const confirmMsg = `Voulez-vous vraiment annuler et supprimer définitivement cette transaction (${editingTransaction.type} de ${formatMoney(editingTransaction.amount)} F pour "${editingTransaction.actor}") ?\n\nCette action est tracée dans le journal et mettra à jour tous les soldes immédiatement.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsDeleting(true);
+    setAuthError('');
+
+    try {
+      const baseUrl = getApiUrl();
+      const response = await fetch(`${baseUrl}/api/transactions/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminEmail,
+          adminPassword,
+          transactionId: editingTransaction.id,
+          type: editingTransaction.type,
+          motive: editMotive.trim()
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok || result.status === 'error') {
+        throw new Error(result.message || "Erreur lors de l'annulation de la transaction");
+      }
+
+      setTransactions(prev => prev.filter(tx => tx.uniqueId !== editingTransaction.uniqueId));
+      alert('La transaction a été annulée et supprimée avec succès.');
+      setIsModalOpen(false);
+      void fetchTransactions();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erreur d'annulation";
+      console.error("Erreur d'annulation:", message);
+      setAuthError(message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -427,7 +493,7 @@ const Transactions = () => {
                           {tx.type === 'Sass' && (
                             <span className={`text-[11px] font-semibold ${
                               tx.raw.status === 'Validé' ? 'text-green-600 dark:text-green-400' :
-                              tx.raw.status === 'Rejeté' ? 'text-red-500' : 'text-amber-500'
+                              tx.raw.status === 'Rejeté' || tx.raw.status === 'Annulé' ? 'text-red-500' : 'text-amber-500'
                             }`}>
                               Statut : {tx.raw.status || 'En attente'}
                             </span>
@@ -540,6 +606,7 @@ const Transactions = () => {
                         <option value="Validé">Validé</option>
                         <option value="En attente">En attente</option>
                         <option value="Rejeté">Rejeté</option>
+                        <option value="Annulé">Annulé</option>
                       </select>
                     </div>
                   </>
@@ -548,12 +615,25 @@ const Transactions = () => {
                 {editingTransaction.type === 'Revenu' && (
                   <>
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-1">Source / Rubrique</label>
-                      <input required value={editSource} onChange={e => setEditSource(e.target.value)} type="text" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                      <label className="block text-sm font-medium text-foreground mb-1">Source / Rubrique *</label>
+                      <input
+                        required
+                        list="income-sources-list"
+                        value={editSource}
+                        onChange={e => setEditSource(e.target.value)}
+                        type="text"
+                        placeholder="Ex: Barkelou, Dons Anonymes, Autre..."
+                        className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none"
+                      />
+                      <datalist id="income-sources-list">
+                        {INCOME_SOURCES.map(src => (
+                          <option key={src} value={src} />
+                        ))}
+                      </datalist>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-foreground mb-1">Description</label>
-                      <input value={editDesc} onChange={e => setEditDesc(e.target.value)} type="text" className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
+                      <input value={editDesc} onChange={e => setEditDesc(e.target.value)} type="text" placeholder="Précision ou référence..." className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground focus:ring-2 focus:ring-primary outline-none" />
                     </div>
                   </>
                 )}
@@ -648,14 +728,25 @@ const Transactions = () => {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-border/50 mt-6 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors">
-                  Annuler
+              <div className="pt-6 border-t border-border/50 mt-6 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={handleDeleteTransaction}
+                  disabled={isSubmitting || isDeleting}
+                  className="px-4 py-2.5 font-semibold text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? <Loader2 size={16} className="animate-spin mr-2" /> : <Trash2 size={16} className="mr-2" />}
+                  Annuler &amp; Supprimer
                 </button>
-                <button type="submit" disabled={isSubmitting} className="bg-primary text-primary-foreground font-semibold px-5 py-2.5 rounded-xl flex items-center shadow-md hover:shadow-lg transition-all disabled:opacity-50">
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin mr-2" /> : <CheckCircle size={18} className="mr-2" />}
-                  Valider la Modification
-                </button>
+                <div className="flex justify-end space-x-3">
+                  <button type="button" onClick={() => setIsModalOpen(false)} disabled={isSubmitting || isDeleting} className="px-5 py-2.5 font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-xl transition-colors">
+                    Fermer
+                  </button>
+                  <button type="submit" disabled={isSubmitting || isDeleting} className="bg-primary text-primary-foreground font-semibold px-5 py-2.5 rounded-xl flex items-center shadow-md hover:shadow-lg transition-all disabled:opacity-50">
+                    {isSubmitting ? <Loader2 size={18} className="animate-spin mr-2" /> : <CheckCircle size={18} className="mr-2" />}
+                    Valider la Modification
+                  </button>
+                </div>
               </div>
             </form>
           </div>
